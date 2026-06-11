@@ -1,0 +1,16 @@
+[project]
+name = "gestao-usuarios"
+version = "0.1.0"
+description = "Backend do App Experimental de Triagem em Saúde — gerenciamento de usuários"
+requires-python = ">=3.12"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
