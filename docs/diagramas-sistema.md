@@ -1,89 +1,138 @@
-# Diagramas do Sistema: Mobile Diagn (Gerenciamento de Usuários)
+# Diagramas do Sistema — Gerenciamento de Usuários
 
-Abaixo estão os diagramas atualizados, focados na parte de **gerenciamento de usuários** e unidades de saúde. Foram adicionados mais detalhes às entidades (atributos) e incluída a funcionalidade do Médico cadastrar pacientes.
+**App Experimental de Triagem em Saúde**
 
-## 1. Diagrama de Casos de Uso
+Este documento concentra os diagramas do **contexto de Gerenciamento de Usuários**:
+o cadastro e a administração dos perfis que operam o sistema — **Administrador**,
+**Gestor da Unidade de Saúde** e **Médico**.
 
-Este diagrama ilustra as interações entre os atores responsáveis pela administração do sistema e pelo atendimento (Admin, Gestor da Unidade de Saúde e Médico).
+> O **Paciente** não é usuário do sistema (ver Documento de Requisitos, §2.4): seus dados
+> são registrados pelo Médico no contexto de *Atendimento/Triagem*, que será diagramado
+> em sprint própria. Por isso ele não aparece aqui.
 
-```mermaid
-flowchart LR
-    Admin([Admin])
-    Gestor([Gestor da Unidade de Saúde])
-    Medico([Médico])
-
-    subgraph Gerenciamento de Usuários
-        UC1(Cadastrar Unidade Básica de Saúde)
-        UC2(Gerenciar Solução)
-        UC3(Cadastrar Médico)
-        UC4(Gerenciar Unidade de Saúde)
-        UC5(Consultar Próprio Cadastro)
-        UC6(Cadastrar Paciente)
-    end
-
-    Admin --> UC1
-    Admin --> UC2
-
-    Gestor --> UC3
-    Gestor --> UC4
-
-    Medico --> UC5
-    Medico --> UC6
-```
-
-
-> [!NOTE]
-> - **Admin:** Atua no nível mais alto, gerenciando o sistema e sendo responsável por cadastrar as Unidades Básicas de Saúde (UBS).
-> - **Gestor da Unidade de Saúde:** Atua localmente na sua respectiva UBS, com permissão para gerenciar as rotinas da unidade e cadastrar os Médicos associados a ela.
-> - **Médico:** O profissional de saúde que pode consultar seus próprios dados e é o responsável pelo **cadastro dos Pacientes** no sistema.
+Os diagramas estão alinhados aos requisitos **RF02** (gerenciar gestores e médicos),
+**RF03** (autenticar por perfil) e **NF008** (controle de acesso por perfil), e à decisão
+arquitetural [ADR-001 — Arquitetura Hexagonal](adr/ADR-001-arquitetura-hexagonal.md).
 
 ---
 
-## 2. Diagrama de Classe de Análise (Fronteira, Controle, Entidade)
+## 1. Diagrama de Casos de Uso
 
-O diagrama abaixo utiliza o padrão **ECB (Entity, Control, Boundary)**, com entidades enriquecidas de atributos e a adição do fluxo de gestão de pacientes.
+Atores e suas interações com o contexto de gerenciamento de usuários. Há três atores
+(mínimo de dois atendido): **Administrador** e **Gestor** dirigem a gestão; o **Médico**
+consulta o próprio cadastro.
+
+```mermaid
+flowchart LR
+    Admin([Administrador])
+    Gestor([Gestor da Unidade])
+    Medico([Médico])
+
+    subgraph SGU[Gerenciamento de Usuários]
+        UC_AUTH(("Autenticar por Perfil"))
+        UC_ADD("Adicionar Usuário")
+        UC_LIST("Listar Usuários")
+        UC_TOGGLE("Ativar / Desativar Usuário")
+        UC_SELF("Consultar Próprio Cadastro")
+    end
+
+    Admin --> UC_ADD
+    Admin --> UC_LIST
+    Admin --> UC_TOGGLE
+
+    Gestor --> UC_ADD
+    Gestor --> UC_LIST
+
+    Medico --> UC_SELF
+
+    UC_ADD -.->|"«include»"| UC_AUTH
+    UC_LIST -.->|"«include»"| UC_AUTH
+    UC_TOGGLE -.->|"«include»"| UC_AUTH
+    UC_SELF -.->|"«include»"| UC_AUTH
+```
+
+> [!NOTE]
+> **Hierarquia de permissões (NF008):**
+> - **Administrador:** adiciona **Gestores** e os vincula a uma UBS; lista e ativa/desativa usuários no escopo global.
+> - **Gestor:** adiciona **Médicos** dentro da **sua própria** unidade; lista os usuários da unidade.
+> - **Médico:** consulta apenas o próprio cadastro.
+>
+> Toda ação de gestão exige **Autenticar por Perfil** («include»), garantindo que um perfil
+> não acesse funções de outro.
+
+**Foco da Sprint 1:** os casos de uso **Adicionar Usuário** e **Listar Usuários**.
+
+---
+
+## 2. Diagrama de Classe de Análise (ECB)
+
+Padrão **ECB (Entity, Control, Boundary)**. A leitura em chave hexagonal (ADR-001):
+a **Fronteira** é um *adaptador primário*, o **Controle** é o *núcleo / caso de uso*, as
+**Entidades** são o *domínio*, e `RepositorioUsuario` é uma **porta secundária** — cujo
+adaptador, na Sprint 1, é uma implementação em memória (RAM).
 
 ```mermaid
 classDiagram
-    %% Fronteiras (Boundary) - Interfaces com as quais os atores interagem
-    class TelaAdmin {
+    %% ---------- Fronteira (Boundary) = adaptador primário ----------
+    class TelaGerenciamentoUsuarios {
         <<Boundary>>
-        +exibirPainelAdmin()
-        +solicitarDadosUBS()
-    }
-    
-    class TelaGestor {
-        <<Boundary>>
-        +exibirPainelGestaoUBS()
-        +solicitarDadosMedico()
-    }
-    
-    class TelaMedico {
-        <<Boundary>>
-        +exibirPerfil()
-        +solicitarDadosPaciente()
+        +exibirFormularioUsuario()
+        +exibirListaUsuarios(usuarios)
+        +solicitarDadosUsuario()
     }
 
-    %% Controles (Control) - Coordenam fluxos e regras de negócio
-    class ControleSistemaGlobal {
+    %% ---------- Controle (Control) = núcleo / casos de uso ----------
+    class GerenciadorDeUsuarios {
         <<Control>>
-        +cadastrarUBS(dados)
-        +gerenciarSolucao()
-    }
-    
-    class ControleGestaoUnidade {
-        <<Control>>
-        +cadastrarMedico(dados, idUBS)
-        +atualizarDadosUnidade(idUBS)
-    }
-    
-    class ControleMedico {
-        <<Control>>
-        +consultarPerfil(idMedico)
-        +cadastrarPaciente(dadosPaciente, idMedico)
+        +adicionarUsuario(dados) Usuario
+        +listarUsuarios() List~Usuario~
+        +ativarOuDesativar(id, ativo)
     }
 
-    %% Entidades (Entity) - Representam os dados de forma enriquecida
+    %% ---------- Porta secundária (hexagonal) ----------
+    class RepositorioUsuario {
+        <<interface>>
+        +salvar(usuario) Usuario
+        +buscarTodos() List~Usuario~
+        +buscarPorId(id) Usuario
+    }
+
+    %% ---------- Entidades (Entity) = domínio ----------
+    class Usuario {
+        <<Entity>>
+        +id: int
+        +nome: string
+        +cpf: string
+        +email: string
+        +telefone: string
+        +ativo: boolean
+        +perfil: Perfil
+    }
+
+    class Perfil {
+        <<enumeration>>
+        ADMINISTRADOR
+        GESTOR
+        MEDICO
+    }
+
+    class Administrador {
+        <<Entity>>
+    }
+
+    class Gestor {
+        <<Entity>>
+        +dataCadastro: Date
+        +idUnidade: int
+    }
+
+    class Medico {
+        <<Entity>>
+        +crm: string
+        +especialidade: string
+        +idUnidade: int
+    }
+
     class UnidadeBasicaSaude {
         <<Entity>>
         +id: int
@@ -92,56 +141,38 @@ classDiagram
         +endereco: string
         +telefone: string
         +horarioFuncionamento: string
-        +statusAtiva: boolean
-    }
-    
-    class Gestor {
-        <<Entity>>
-        +id: int
-        +cpf: string
-        +nome: string
-        +email: string
-        +telefone: string
-        +dataContratacao: Date
-    }
-    
-    class Medico {
-        <<Entity>>
-        +id: int
-        +crm: string
-        +nome: string
-        +especialidade: string
-        +telefone: string
-        +email: string
-        +ativo: boolean
-    }
-    
-    class Paciente {
-        <<Entity>>
-        +id: int
-        +cpf: string
-        +nome: string
-        +dataNascimento: Date
-        +sexo: string
-        +telefone: string
-        +endereco: string
-        +historicoFamiliar: string
+        +ativa: boolean
     }
 
-    %% Relações e Associações
-    TelaAdmin --> ControleSistemaGlobal : "solicita"
-    TelaGestor --> ControleGestaoUnidade : "solicita"
-    TelaMedico --> ControleMedico : "solicita"
-    
-    ControleSistemaGlobal --> UnidadeBasicaSaude : "instancia / persiste"
-    ControleSistemaGlobal --> Gestor : "associa Gestor à UBS"
-    
-    ControleGestaoUnidade --> Medico : "instancia / persiste"
-    ControleGestaoUnidade --> UnidadeBasicaSaude : "consulta / gerencia"
-    
-    ControleMedico --> Medico : "consulta"
-    ControleMedico --> Paciente : "instancia / persiste"
-    ControleMedico --> Paciente : "vincula Paciente ao Médico/UBS"
+    %% ---------- Relações ----------
+    TelaGerenciamentoUsuarios ..> GerenciadorDeUsuarios : solicita
+    GerenciadorDeUsuarios ..> RepositorioUsuario : usa «porta»
+    GerenciadorDeUsuarios ..> Usuario : cria / consulta
+
+    Usuario <|-- Administrador
+    Usuario <|-- Gestor
+    Usuario <|-- Medico
+    Usuario --> Perfil : possui
+
+    Gestor --> UnidadeBasicaSaude : vinculado a
+    Medico --> UnidadeBasicaSaude : vinculado a
 ```
 
+> [!NOTE]
+> - `Usuario` é a **abstração comum** dos três perfis; `Perfil` distingue o tipo de acesso (RF03).
+>   Isso permite **Adicionar** e **Listar** usuários de forma uniforme — o núcleo da Sprint 1.
+> - `GerenciadorDeUsuarios` depende da **interface** `RepositorioUsuario`, nunca de uma
+>   implementação concreta (Dependency Inversion, ADR-001). Trocar memória → banco real não
+>   afeta o Controle.
 
+---
+
+## 3. Rastreabilidade
+
+| Caso de uso              | Requisito        | Entrega    |
+|--------------------------|------------------|------------|
+| Autenticar por Perfil    | RF03 / NF008     | futura     |
+| Adicionar Usuário        | RF02             | **Sprint 1** |
+| Listar Usuários          | RF02             | **Sprint 1** |
+| Ativar / Desativar Usuário | RF01 / RF02    | futura     |
+| Consultar Próprio Cadastro | RF (UC Médico) | futura     |
