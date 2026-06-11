@@ -7,3 +7,4 @@ Registro das decisões arquiteturais do projeto. Cada decisão relevante vira um
 | ADR | Título | Status |
 |-----|--------|--------|
 | [ADR-001](ADR-001-arquitetura-hexagonal.md) | Adotar Arquitetura Hexagonal (Ports & Adapters) | Aceito |
+| [ADR-002](ADR-002-stack-tecnologica.md) | Stack tecnológica — Python (backend) + React Native (mobile) | Aceito |
