@@ -1,0 +1,80 @@
+@startuml
+title Diagrama de Classes - Laboratório 2: Tratamento de Erros
+
+skinparam classAttributeIconSize 0
+
+package "dominio" {
+    class Usuario {
+        - id: int | None
+        - nome: str
+        - cpf: str
+        - email: str
+        - telefone: str
+        - login: str
+        - senha: str
+        - perfil: Perfil
+        - ativo: bool
+        + criar(nome, cpf, email, telefone, login, senha, perfil): Usuario
+    }
+
+    enum Perfil {
+        ADMINISTRADOR
+        GESTOR
+        MEDICO
+    }
+
+    class ErroDeDominio
+    class ErroDeValidacao
+    class CpfDuplicado
+    class ErroDePersistencia
+
+    ErroDeDominio <|-- ErroDeValidacao
+    ErroDeDominio <|-- CpfDuplicado
+    ErroDeDominio <|-- ErroDePersistencia
+
+    Usuario --> Perfil
+}
+
+package "portas" {
+    interface RepositorioUsuario {
+        + salvar(usuario: Usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_cpf(cpf: str): Usuario | None
+    }
+}
+
+package "aplicacao" {
+    class GerenciadorDeUsuarios {
+        - repositorio: RepositorioUsuario
+        + adicionar_usuario(nome, cpf, email, telefone, login, senha, perfil): Usuario
+        + listar_usuarios(): list<Usuario>
+    }
+}
+
+package "adaptadores" {
+    class RepositorioUsuarioEmMemoria {
+        - usuarios: dict<int, Usuario>
+        - proximo_id: int
+        + salvar(usuario: Usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_cpf(cpf: str): Usuario | None
+    }
+
+    class RepositorioUsuarioArquivoBinario {
+        - caminho_arquivo: str
+        + salvar(usuario: Usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_cpf(cpf: str): Usuario | None
+    }
+}
+
+GerenciadorDeUsuarios --> RepositorioUsuario
+RepositorioUsuario <|.. RepositorioUsuarioEmMemoria
+RepositorioUsuario <|.. RepositorioUsuarioArquivoBinario
+
+RepositorioUsuario --> Usuario
+Usuario ..> ErroDeValidacao
+GerenciadorDeUsuarios ..> CpfDuplicado
+RepositorioUsuarioArquivoBinario ..> ErroDePersistencia
+
+@enduml
