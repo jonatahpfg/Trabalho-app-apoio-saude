@@ -1,13 +1,67 @@
-"""Erros do domínio de gerenciamento de usuários."""
+"""Erros do domínio de gerenciamento de usuários.
+
+Hierarquia de exceções aplicando os princípios de boas práticas:
+- Taborda: seja específico, o nome da exceção revela o problema,
+  agrupe exceções de uma mesma camada sob uma base comum.
+- PLoP 2018 (Coelho et al.): evite Catch Generic, preserve o rastro
+  (cause chain) e não faça Destructive Wrapping.
+"""
 
 
 class ErroDeDominio(Exception):
-    """Erro base do domínio."""
+    """Raiz de todos os erros de domínio.
+
+    Permite que o chamador capture qualquer erro de negócio com um único
+    tipo sem precisar conhecer todas as subclasses (Taborda: camadas e
+    exceções). Nunca lance esta classe diretamente — use uma subclasse
+    específica.
+    """
 
 
 class ErroDeValidacao(ErroDeDominio):
-    """Dados de usuário inválidos."""
+    """Dados de entrada inválidos (campo obrigatório vazio, formato errado etc.).
+
+    Lançada cedo, assim que a pré-condição falha (Taborda: seja específico
+    e lance o quanto antes).
+    """
 
 
 class CpfDuplicado(ErroDeDominio):
     """Já existe um usuário cadastrado com o mesmo CPF."""
+
+
+# ---------------------------------------------------------------------------
+# Exceções de autenticação — subárvore ErroDeAutenticacao
+#
+# Seguindo Taborda ("Camadas e exceções"): todas as falhas de login ficam
+# sob ErroDeAutenticacao, que é a exceção de fronteira desta camada.
+# O chamador pode capturar ErroDeAutenticacao para tratar qualquer falha
+# de login, ou capturar uma subclasse específica quando precisar de
+# tratamento diferenciado.
+# ---------------------------------------------------------------------------
+
+
+class ErroDeAutenticacao(ErroDeDominio):
+    """Base de todos os erros de autenticação/login.
+
+    Não lançar diretamente — use CredenciaisInvalidas ou UsuarioInativo.
+    """
+
+
+class CredenciaisInvalidas(ErroDeAutenticacao):
+    """E-mail ou senha incorretos.
+
+    Intencionalmente genérica entre "e-mail não encontrado" e "senha errada"
+    para não vazar ao atacante qual parte está errada (segurança por
+    obscuridade mínima). O nome revela o que deu errado sem revelar o porquê
+    técnico (Taborda: o quê, o onde, o porquê — mas apenas o necessário).
+    """
+
+
+class UsuarioInativo(ErroDeAutenticacao):
+    """Usuário existe e a senha está correta, mas a conta está desativada.
+
+    Exceção separada de CredenciaisInvalidas porque a ação corretiva é
+    diferente: o administrador precisa reativar a conta, não redefinir a
+    senha (Taborda: seja específico o suficiente para guiar o tratamento).
+    """
