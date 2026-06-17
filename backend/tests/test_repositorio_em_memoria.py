@@ -8,8 +8,9 @@ def _usuario(cpf: str = "12345678901") -> Usuario:
     return Usuario.criar(
         nome="Ana",
         cpf=cpf,
-        email="ana@ubs.gov.br",
+        email=f"{cpf}@ubs.gov.br",
         telefone="84999990000",
+        senha="senha123",
         perfil=Perfil.MEDICO,
     )
 
@@ -44,6 +45,14 @@ def test_buscar_por_cpf_encontra_ou_devolve_none():
 
     assert repositorio.buscar_por_cpf("11111111111") is not None
     assert repositorio.buscar_por_cpf("00000000000") is None
+
+
+def test_buscar_por_email_encontra_ou_devolve_none():
+    repositorio = RepositorioUsuarioEmMemoria()
+    repositorio.salvar(_usuario("11111111111"))
+
+    assert repositorio.buscar_por_email("11111111111@ubs.gov.br") is not None
+    assert repositorio.buscar_por_email("naoexiste@ubs.gov.br") is None
 
 
 def test_buscar_todos_nao_vaza_a_colecao_interna():

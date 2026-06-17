@@ -10,6 +10,7 @@ def test_cria_usuario_quando_dados_validos():
         cpf="12345678901",
         email="ana@ubs.gov.br",
         telefone="84999990000",
+        senha="senha123",
         perfil=Perfil.MEDICO,
     )
 
@@ -25,6 +26,7 @@ def test_aceita_perfil_informado_como_texto():
         cpf="98765432100",
         email="bia@ubs.gov.br",
         telefone="84988887777",
+        senha="outrasenha",
         perfil="GESTOR",
     )
 
@@ -38,6 +40,7 @@ def test_rejeita_usuario_quando_nome_vazio():
             cpf="12345678901",
             email="ana@ubs.gov.br",
             telefone="84999990000",
+            senha="senha123",
             perfil=Perfil.MEDICO,
         )
 
@@ -49,6 +52,7 @@ def test_rejeita_usuario_quando_email_invalido():
             cpf="12345678901",
             email="ana-sem-arroba",
             telefone="84999990000",
+            senha="senha123",
             perfil=Perfil.MEDICO,
         )
 
@@ -60,5 +64,18 @@ def test_rejeita_usuario_quando_perfil_invalido():
             cpf="12345678901",
             email="ana@ubs.gov.br",
             telefone="84999990000",
+            senha="senha123",
             perfil="DIRETOR",
+        )
+
+
+def test_rejeita_usuario_quando_senha_vazia():
+    with pytest.raises(ErroDeValidacao):
+        Usuario.criar(
+            nome="Ana",
+            cpf="12345678901",
+            email="ana@ubs.gov.br",
+            telefone="84999990000",
+            senha="",
+            perfil=Perfil.MEDICO,
         )
