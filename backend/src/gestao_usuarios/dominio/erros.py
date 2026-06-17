@@ -65,3 +65,32 @@ class UsuarioInativo(ErroDeAutenticacao):
     diferente: o administrador precisa reativar a conta, não redefinir a
     senha (Taborda: seja específico o suficiente para guiar o tratamento).
     """
+
+class ErroDePersistencia(ErroDeDominio):
+    """Falha ao salvar ou recuperar dados do banco.
+
+    Pode ser causada por falhas de infraestrutura (banco indisponível) ou
+    por violação de regras de negócio (CPF duplicado). O nome genérico
+    reflete a natureza técnica da falha, sem vazar detalhes de implementação
+    (Taborda: o nome da exceção deve revelar o problema, mas não detalhes
+    técnicos desnecessários).
+    """
+
+class ErroDeAcessoAoArquivo(ErroDePersistencia):
+    """Falha ao acessar o arquivo de dados.
+
+    Pode ser causada por falta de permissão, arquivo corrompido ou
+    indisponibilidade do sistema de arquivos. O nome genérico reflete a
+    natureza técnica da falha, sem vazar detalhes de implementação (Taborda:
+    o nome da exceção deve revelar o problema, mas não detalhes técnicos
+    desnecessários).
+    """
+
+class ErroDeAcessoAoBanco(ErroDePersistencia):
+    """Falha ao acessar o banco de dados.
+
+    Pode ser causada por falhas de rede, autenticação ou configuração do
+    banco. O nome genérico reflete a natureza técnica da falha, sem vazar
+    detalhes de implementação (Taborda: o nome da exceção deve revelar o
+    problema, mas não detalhes técnicos desnecessários).
+    """
