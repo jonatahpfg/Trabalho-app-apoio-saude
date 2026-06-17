@@ -27,6 +27,7 @@ class Usuario:
     cpf: str
     email: str
     telefone: str
+    senha: str
     perfil: Perfil
     ativo: bool = True
     id: int | None = None
@@ -39,6 +40,7 @@ class Usuario:
         cpf: str,
         email: str,
         telefone: str,
+        senha: str,
         perfil: Perfil | str,
     ) -> Usuario:
         """Cria um usuário válido ou lança ``ErroDeValidacao``."""
@@ -46,6 +48,7 @@ class Usuario:
         cpf = _texto_obrigatorio(cpf, "cpf")
         email = _texto_obrigatorio(email, "email")
         telefone = _texto_obrigatorio(telefone, "telefone")
+        senha = _texto_obrigatorio(senha, "senha")
 
         if not _FORMATO_EMAIL.match(email):
             raise ErroDeValidacao(f"E-mail inválido: {email!r}")
@@ -55,6 +58,7 @@ class Usuario:
             cpf=cpf,
             email=email,
             telefone=telefone,
+            senha=senha,
             perfil=_perfil_valido(perfil),
         )
 
