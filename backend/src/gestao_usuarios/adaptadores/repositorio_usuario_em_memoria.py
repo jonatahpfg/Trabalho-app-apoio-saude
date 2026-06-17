@@ -29,3 +29,9 @@ class RepositorioUsuarioEmMemoria:
             if usuario.cpf == cpf:
                 return replace(usuario)
         return None
+
+    def buscar_por_email(self, email: str) -> Usuario | None:
+        for usuario in self._usuarios.values():
+            if usuario.email == email:
+                return replace(usuario)
+        return None

@@ -21,3 +21,7 @@ class RepositorioUsuario(Protocol):
     def buscar_por_cpf(self, cpf: str) -> Usuario | None:
         """Devolve o usuário com o CPF informado, ou ``None`` se não existir."""
         ...
+
+    def buscar_por_email(self, email: str) -> Usuario | None:
+        """Devolve o usuário com o e-mail informado, ou ``None`` se não existir."""
+        ...
