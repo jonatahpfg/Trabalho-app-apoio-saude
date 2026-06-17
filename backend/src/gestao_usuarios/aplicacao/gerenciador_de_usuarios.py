@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from ..dominio.erros import CpfDuplicado
+from ..dominio.erros import CpfDuplicado, CredenciaisInvalidas, ErroDeValidacao, UsuarioInativo
 from ..dominio.usuario import Perfil, Usuario
 from ..portas.repositorio_usuario import RepositorioUsuario
 
 
 class GerenciadorDeUsuarios:
-    """Orquestra a adição e a listagem de usuários sobre um RepositorioUsuario."""
+    """Orquestra a adição, a listagem e a autenticação de usuários."""
 
     def __init__(self, repositorio: RepositorioUsuario) -> None:
         self._repositorio = repositorio
@@ -20,6 +20,7 @@ class GerenciadorDeUsuarios:
         cpf: str,
         email: str,
         telefone: str,
+        senha: str,
         perfil: Perfil | str,
     ) -> Usuario:
         """Valida os dados, garante CPF único e persiste o usuário."""
@@ -28,6 +29,7 @@ class GerenciadorDeUsuarios:
             cpf=cpf,
             email=email,
             telefone=telefone,
+            senha=senha,
             perfil=perfil,
         )
         if self._repositorio.buscar_por_cpf(usuario.cpf) is not None:
@@ -37,3 +39,50 @@ class GerenciadorDeUsuarios:
     def listar_usuarios(self) -> list[Usuario]:
         """Devolve todos os usuários cadastrados."""
         return self._repositorio.buscar_todos()
+
+    def autenticar(self, *, email: str, senha: str) -> Usuario:
+        """Valida credenciais e devolve o usuário autenticado.
+
+        Aplica as boas práticas dos artigos do professor:
+
+        - Taborda — "Seja específico": lança CredenciaisInvalidas (não
+          uma Exception genérica) quando o e-mail não existe ou a senha
+          está errada; lança UsuarioInativo quando a conta está bloqueada.
+          Ambas derivam de ErroDeAutenticacao, permitindo que o chamador
+          capture qualquer falha de login com um único tipo se quiser.
+
+        - PLoP 2018 (Coelho et al.) — evita "Catch Generic" e
+          "Destructive Wrapping": nenhuma exceção é capturada aqui sem ser
+          relançada; o rastro de causa é preservado implicitamente porque
+          nenhum wrapping acontece — as exceções são lançadas diretamente
+          sem encapsular outra.
+
+        Raises:
+            ErroDeValidacao: e-mail ou senha em branco.
+            CredenciaisInvalidas: e-mail não cadastrado ou senha errada.
+            UsuarioInativo: usuário existe, senha correta, mas conta inativa.
+        """
+        # Pré-condições verificadas primeiro (Taborda: lance o quanto antes)
+        if not email or not str(email).strip():
+            raise ErroDeValidacao("Campo obrigatório ausente: email")
+        if not senha or not str(senha).strip():
+            raise ErroDeValidacao("Campo obrigatório ausente: senha")
+
+        usuario = self._repositorio.buscar_por_email(email)
+
+        # Não distinguimos "e-mail inexistente" de "senha errada" para não
+        # vazar informação ao atacante — CredenciaisInvalidas cobre os dois.
+        if usuario is None or usuario.senha != senha:
+            raise CredenciaisInvalidas(
+                "E-mail ou senha incorretos."
+            )
+
+        # Só após confirmar as credenciais verificamos se a conta está ativa.
+        # UsuarioInativo é separado de CredenciaisInvalidas porque a ação
+        # corretiva é diferente: reativar a conta, não redefinir a senha.
+        if not usuario.ativo:
+            raise UsuarioInativo(
+                f"A conta do usuário '{usuario.nome}' está desativada."
+            )
+
+        return usuario
