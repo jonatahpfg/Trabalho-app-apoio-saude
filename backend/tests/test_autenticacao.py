@@ -42,7 +42,7 @@ def gerenciador_com_usuario(gerenciador: GerenciadorDeUsuarios) -> GerenciadorDe
         cpf="12345678901",
         email="ana@ubs.gov.br",
         telefone="84999990000",
-        senha="senha_secreta",
+        senha="SenhaSecreta1!",
         perfil=Perfil.MEDICO,
     )
     return gerenciador
@@ -56,7 +56,7 @@ def test_autentica_usuario_com_credenciais_validas(gerenciador_com_usuario):
     """Caminho feliz: credenciais corretas devolvem o usuário autenticado."""
     usuario = gerenciador_com_usuario.autenticar(
         email="ana@ubs.gov.br",
-        senha="senha_secreta",
+        senha="SenhaSecreta1!",
     )
 
     assert usuario.nome == "Ana Souza"
@@ -72,7 +72,7 @@ def test_autentica_usuario_com_credenciais_validas(gerenciador_com_usuario):
 
 def test_rejeita_login_quando_email_vazio(gerenciador_com_usuario):
     with pytest.raises(ErroDeValidacao):
-        gerenciador_com_usuario.autenticar(email="", senha="senha_secreta")
+        gerenciador_com_usuario.autenticar(email="", senha="SenhaSecreta1!")
 
 
 def test_rejeita_login_quando_senha_vazia(gerenciador_com_usuario):
@@ -82,7 +82,7 @@ def test_rejeita_login_quando_senha_vazia(gerenciador_com_usuario):
 
 def test_rejeita_login_quando_email_apenas_espacos(gerenciador_com_usuario):
     with pytest.raises(ErroDeValidacao):
-        gerenciador_com_usuario.autenticar(email="   ", senha="senha_secreta")
+        gerenciador_com_usuario.autenticar(email="   ", senha="SenhaSecreta1!")
 
 
 # ---------------------------------------------------------------------------

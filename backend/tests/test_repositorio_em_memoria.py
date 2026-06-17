@@ -10,7 +10,7 @@ def _usuario(cpf: str = "12345678901") -> Usuario:
         cpf=cpf,
         email=f"{cpf}@ubs.gov.br",
         telefone="84999990000",
-        senha="senha123",
+        senha="Senha123!",
         perfil=Perfil.MEDICO,
     )
 

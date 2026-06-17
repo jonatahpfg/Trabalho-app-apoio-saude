@@ -19,7 +19,7 @@ def test_adiciona_usuario_quando_dados_validos(gerenciador):
         cpf="12345678901",
         email="ana@ubs.gov.br",
         telefone="84999990000",
-        senha="senha123",
+        senha="Senha123!",
         perfil=Perfil.MEDICO,
     )
 
@@ -34,7 +34,7 @@ def test_rejeita_usuario_quando_cpf_vazio(gerenciador):
             cpf="",
             email="ana@ubs.gov.br",
             telefone="84999990000",
-            senha="senha123",
+            senha="Senha123!",
             perfil=Perfil.MEDICO,
         )
 
@@ -45,7 +45,7 @@ def test_rejeita_usuario_quando_cpf_duplicado(gerenciador):
         cpf="12345678901",
         email="ana@ubs.gov.br",
         telefone="84999990000",
-        senha="senha123",
+        senha="Senha123!",
         perfil=Perfil.MEDICO,
     )
     gerenciador.adicionar_usuario(**dados)
@@ -60,7 +60,7 @@ def test_lista_todos_os_usuarios_cadastrados(gerenciador):
         cpf="11111111111",
         email="ana@ubs.gov.br",
         telefone="84999990000",
-        senha="senha123",
+        senha="Senha123!",
         perfil=Perfil.MEDICO,
     )
     gerenciador.adicionar_usuario(
@@ -68,7 +68,7 @@ def test_lista_todos_os_usuarios_cadastrados(gerenciador):
         cpf="22222222222",
         email="bia@ubs.gov.br",
         telefone="84988887777",
-        senha="outrasenha",
+        senha="OutraSenha1!",
         perfil=Perfil.GESTOR,
     )
 
