@@ -68,8 +68,19 @@ flowchart LR
 
 Padrão **ECB (Entity, Control, Boundary)**. A leitura em chave hexagonal (ADR-001):
 a **Fronteira** é um *adaptador primário*, o **Controle** é o *núcleo / caso de uso*, as
-**Entidades** são o *domínio*, e `RepositorioUsuario` é uma **porta secundária** — cujo
-adaptador, na Sprint 1, é uma implementação em memória (RAM).
+**Entidades** são o *domínio*, e `RepositorioUsuario` é uma **porta secundária**.
+
+Para o **Laboratório 2 — Tratamento de Erros**, o diagrama foi atualizado para incluir:
+
+* os campos `login` e `senha` na entidade `Usuario`;
+* validações de campos usando exceções;
+* tratamento de CPF duplicado;
+* tratamento de erro de persistência;
+* dois mecanismos de persistência: memória RAM e arquivo binário;
+* manutenção da arquitetura hexagonal, com o núcleo dependendo da porta `RepositorioUsuario`.
+
+O arquivo PlantUML do diagrama está disponível em:
+[`diagrama-classes.puml`](diagrama-classes.puml)
 
 ```mermaid
 classDiagram
@@ -84,6 +95,7 @@ classDiagram
     %% ---------- Controle (Control) = núcleo / casos de uso ----------
     class GerenciadorDeUsuarios {
         <<Control>>
+        -repositorio: RepositorioUsuario
         +adicionarUsuario(dados) Usuario
         +listarUsuarios() List~Usuario~
         +ativarOuDesativar(id, ativo)
@@ -94,6 +106,27 @@ classDiagram
         <<interface>>
         +salvar(usuario) Usuario
         +buscarTodos() List~Usuario~
+        +buscarPorCpf(cpf) Usuario
+        +buscarPorId(id) Usuario
+    }
+
+    %% ---------- Adaptadores de persistência ----------
+    class RepositorioUsuarioEmMemoria {
+        <<Adapter>>
+        -usuarios: Dict~int, Usuario~
+        -proximoId: int
+        +salvar(usuario) Usuario
+        +buscarTodos() List~Usuario~
+        +buscarPorCpf(cpf) Usuario
+        +buscarPorId(id) Usuario
+    }
+
+    class RepositorioUsuarioArquivoBinario {
+        <<Adapter>>
+        -caminhoArquivo: string
+        +salvar(usuario) Usuario
+        +buscarTodos() List~Usuario~
+        +buscarPorCpf(cpf) Usuario
         +buscarPorId(id) Usuario
     }
 
@@ -105,8 +138,11 @@ classDiagram
         +cpf: string
         +email: string
         +telefone: string
+        +login: string
+        +senha: string
         +ativo: boolean
         +perfil: Perfil
+        +criar(dados) Usuario
     }
 
     class Perfil {
@@ -144,35 +180,74 @@ classDiagram
         +ativa: boolean
     }
 
+    %% ---------- Exceções ----------
+    class ErroDeDominio {
+        <<Exception>>
+    }
+
+    class ErroDeValidacao {
+        <<Exception>>
+    }
+
+    class CpfDuplicado {
+        <<Exception>>
+    }
+
+    class ErroDePersistencia {
+        <<Exception>>
+    }
+
     %% ---------- Relações ----------
     TelaGerenciamentoUsuarios ..> GerenciadorDeUsuarios : solicita
+
     GerenciadorDeUsuarios ..> RepositorioUsuario : usa «porta»
     GerenciadorDeUsuarios ..> Usuario : cria / consulta
+    GerenciadorDeUsuarios ..> CpfDuplicado : lança
+
+    RepositorioUsuario <|.. RepositorioUsuarioEmMemoria
+    RepositorioUsuario <|.. RepositorioUsuarioArquivoBinario
+    RepositorioUsuario ..> Usuario : persiste
+
+    RepositorioUsuarioArquivoBinario ..> ErroDePersistencia : lança
 
     Usuario <|-- Administrador
     Usuario <|-- Gestor
     Usuario <|-- Medico
     Usuario --> Perfil : possui
+    Usuario ..> ErroDeValidacao : lança
+
+    ErroDeDominio <|-- ErroDeValidacao
+    ErroDeDominio <|-- CpfDuplicado
+    ErroDeDominio <|-- ErroDePersistencia
 
     Gestor --> UnidadeBasicaSaude : vinculado a
     Medico --> UnidadeBasicaSaude : vinculado a
 ```
 
 > [!NOTE]
-> - `Usuario` é a **abstração comum** dos três perfis; `Perfil` distingue o tipo de acesso (RF03).
->   Isso permite **Adicionar** e **Listar** usuários de forma uniforme — o núcleo da Sprint 1.
-> - `GerenciadorDeUsuarios` depende da **interface** `RepositorioUsuario`, nunca de uma
->   implementação concreta (Dependency Inversion, ADR-001). Trocar memória → banco real não
->   afeta o Controle.
+>
+> * `Usuario` é a **abstração comum** dos três perfis; `Perfil` distingue o tipo de acesso (RF03).
+> * No Laboratório 2, `Usuario` passa a representar também os dados de autenticação `login` e `senha`.
+> * As validações de `login`, `senha`, e demais campos obrigatórios são representadas por `ErroDeValidacao`.
+> * `GerenciadorDeUsuarios` continua dependendo da **interface** `RepositorioUsuario`, nunca de uma implementação concreta.
+> * `RepositorioUsuarioEmMemoria` e `RepositorioUsuarioArquivoBinario` são adaptadores intercambiáveis da mesma porta.
+> * Falhas de leitura ou gravação no arquivo binário são representadas por `ErroDePersistencia`.
+
 
 ---
 
 ## 3. Rastreabilidade
 
-| Caso de uso              | Requisito        | Entrega    |
-|--------------------------|------------------|------------|
-| Autenticar por Perfil    | RF03 / NF008     | futura     |
-| Adicionar Usuário        | RF02             | **Sprint 1** |
-| Listar Usuários          | RF02             | **Sprint 1** |
-| Ativar / Desativar Usuário | RF01 / RF02    | futura     |
-| Consultar Próprio Cadastro | RF (UC Médico) | futura     |
+| Caso de uso / item técnico      | Requisito / Laboratório  | Entrega          |
+| ------------------------------- | ------------------------ | ---------------- |
+| Autenticar por Perfil           | RF03 / NF008             | futura           |
+| Adicionar Usuário               | RF02                     | Sprint 1 / Sprint 2 |
+| Listar Usuários                 | RF02                     | Sprint 1         |
+| Validar Login                   | Sprint 2                    | Sprint 2            |
+| Validar Senha                   | Sprint 2 / Política AWS IAM | Sprint 2            |
+| Tratar Erros de Validação       | Sprint 2                    | Sprint 2            |
+| Persistência em Memória RAM     | ADR-002 / Sprint 2          | Sprint 1 / Sprint 2 |
+| Persistência em Arquivo Binário | Sprint 2                    | Sprint 2            |
+| Tratar Erros de Persistência    | Sprint 2                    | Sprint 2            |
+| Ativar / Desativar Usuário      | RF01 / RF02              | futura           |
+| Consultar Próprio Cadastro      | RF Médico                | futura           |
