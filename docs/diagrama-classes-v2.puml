@@ -1,0 +1,161 @@
+@startuml
+title Diagrama de Classes - Nova Esquematização com Facade e Paciente
+
+skinparam classAttributeIconSize 0
+
+package "dominio" {
+    class Usuario {
+        - id: int | None
+        - nome: str
+        - cpf: str
+        - email: str
+        - telefone: str
+        - login: str
+        - senha: str
+        - perfil: Perfil
+        - ativo: bool
+        + criar(nome, cpf, email, telefone, login, senha, perfil): Usuario
+    }
+
+    enum Perfil {
+        ADMINISTRADOR
+        GESTOR
+        MEDICO
+    }
+
+    class Paciente {
+        - id: int | None
+        - nome: str
+        - cpf: str
+        - data_nascimento: date
+        - telefone: str
+        - ativo: bool
+        + criar(nome, cpf, data_nascimento, telefone): Paciente
+    }
+
+    ' Tratamento de Erros e Exceções
+    class ErroDeDominio
+    class ErroDeValidacao
+    class CpfDuplicado
+    class ErroDePersistencia
+    
+    ' Novas Exceções
+    class PacienteNaoEncontrado
+    class UsuarioNaoEncontrado
+    class AcessoNegado
+    class IdadeInvalida
+
+    ErroDeDominio <|-- ErroDeValidacao
+    ErroDeDominio <|-- CpfDuplicado
+    ErroDeDominio <|-- ErroDePersistencia
+    ErroDeDominio <|-- PacienteNaoEncontrado
+    ErroDeDominio <|-- UsuarioNaoEncontrado
+    ErroDeDominio <|-- AcessoNegado
+    ErroDeValidacao <|-- IdadeInvalida
+
+    Usuario --> Perfil
+}
+
+package "portas" {
+    interface RepositorioUsuario {
+        + salvar(usuario: Usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_cpf(cpf: str): Usuario | None
+        + buscar_por_id(id: int): Usuario | None
+    }
+
+    interface RepositorioPaciente {
+        + salvar(paciente: Paciente): Paciente
+        + buscar_todos(): list<Paciente>
+        + buscar_por_cpf(cpf: str): Paciente | None
+        + buscar_por_id(id: int): Paciente | None
+    }
+}
+
+package "aplicacao" {
+    class GerenciadorDeUsuarios {
+        - repositorio: RepositorioUsuario
+        + adicionar_usuario(nome, cpf, email, telefone, login, senha, perfil): Usuario
+        + listar_usuarios(): list<Usuario>
+        + buscar_usuario(id: int): Usuario
+    }
+
+    class GerenciadorDePacientes {
+        - repositorio: RepositorioPaciente
+        + adicionar_paciente(nome, cpf, data_nascimento, telefone): Paciente
+        + listar_pacientes(): list<Paciente>
+        + buscar_paciente(id: int): Paciente
+    }
+
+    class FacadeSingletonController <<Facade>> <<Singleton>> {
+        - {static} instancia: FacadeSingletonController
+        - gerenciador_usuarios: GerenciadorDeUsuarios
+        - gerenciador_pacientes: GerenciadorDePacientes
+        
+        - FacadeSingletonController()
+        + {static} get_instance(): FacadeSingletonController
+        
+        + obter_quantidade_total_entidades_cadastradas(): int
+        
+        ' Delegações
+        + adicionar_usuario(...)
+        + adicionar_paciente(...)
+        + listar_usuarios(): list<Usuario>
+        + listar_pacientes(): list<Paciente>
+    }
+}
+
+package "adaptadores" {
+    class RepositorioUsuarioEmMemoria {
+        - usuarios: dict<int, Usuario>
+        - proximo_id: int
+        + salvar(usuario: Usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_cpf(cpf: str): Usuario | None
+        + buscar_por_id(id: int): Usuario | None
+    }
+
+    class RepositorioUsuarioArquivoBinario {
+        - caminho_arquivo: str
+        + salvar(usuario: Usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_cpf(cpf: str): Usuario | None
+        + buscar_por_id(id: int): Usuario | None
+    }
+
+    class RepositorioPacienteEmMemoria {
+        - pacientes: dict<int, Paciente>
+        - proximo_id: int
+        + salvar(paciente: Paciente): Paciente
+        + buscar_todos(): list<Paciente>
+        + buscar_por_cpf(cpf: str): Paciente | None
+        + buscar_por_id(id: int): Paciente | None
+    }
+}
+
+' Relacionamentos Estruturais
+FacadeSingletonController --> GerenciadorDeUsuarios : delega
+FacadeSingletonController --> GerenciadorDePacientes : delega
+
+GerenciadorDeUsuarios --> RepositorioUsuario
+GerenciadorDePacientes --> RepositorioPaciente
+
+RepositorioUsuario <|.. RepositorioUsuarioEmMemoria
+RepositorioUsuario <|.. RepositorioUsuarioArquivoBinario
+
+RepositorioPaciente <|.. RepositorioPacienteEmMemoria
+
+' Dependências de Entidades
+RepositorioUsuario --> Usuario
+RepositorioPaciente --> Paciente
+
+' Dependências de Exceções
+GerenciadorDeUsuarios ..> CpfDuplicado
+GerenciadorDeUsuarios ..> UsuarioNaoEncontrado
+GerenciadorDePacientes ..> CpfDuplicado
+GerenciadorDePacientes ..> PacienteNaoEncontrado
+FacadeSingletonController ..> AcessoNegado
+Paciente ..> IdadeInvalida
+Usuario ..> ErroDeValidacao
+
+@enduml
