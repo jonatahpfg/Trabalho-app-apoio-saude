@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ..dominio.erros import CpfDuplicado, CredenciaisInvalidas, ErroDeValidacao, UsuarioInativo
+from ..dominio.senha import verificar
 from ..dominio.usuario import Perfil, Usuario
 from ..portas.repositorio_usuario import RepositorioUsuario
 
@@ -72,7 +73,9 @@ class GerenciadorDeUsuarios:
 
         # Não distinguimos "e-mail inexistente" de "senha errada" para não
         # vazar informação ao atacante — CredenciaisInvalidas cobre os dois.
-        if usuario is None or usuario.senha != senha:
+        # A comparação é feita contra o hash (NF007): a senha em texto puro
+        # nunca é armazenada nem comparada diretamente.
+        if usuario is None or not verificar(senha, usuario.senha_hash):
             raise CredenciaisInvalidas(
                 "E-mail ou senha incorretos."
             )
