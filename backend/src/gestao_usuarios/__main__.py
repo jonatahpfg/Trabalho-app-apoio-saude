@@ -16,10 +16,10 @@ from .adaptadores.repositorio_usuario_em_memoria import RepositorioUsuarioEmMemo
 from .adaptadores.repositorio_usuario_banco_de_dados import RepositorioUsuarioBancoDeDados
 from .aplicacao.gerenciador_de_usuarios import GerenciadorDeUsuarios
 from .dominio.erros import (
-    CredenciaisInvalidas, 
-    ErroDeAutenticacao, 
-    ErroDePersistencia, 
-    UsuarioInativo
+    CpfDuplicado,
+    CredenciaisInvalidas,
+    ErroDeAutenticacao,
+    ErroDePersistencia
 )
 from .dominio.usuario import Perfil
 
@@ -60,7 +60,7 @@ def main() -> None:
             senha="OutraSenha2@",
             perfil=Perfil.MEDICO,
         )
-    except ErroDePersistencia as e:
+    except (ErroDePersistencia, CpfDuplicado) as e:
         print(f"Erro Crítico de Persistência/Banco de Dados ao inicializar: {e}", file=sys.stderr)
         # Finaliza com erro pois o banco falhou ou o CPF/E-mail já está cadastrado
         return

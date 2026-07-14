@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .erros import ErroDeValidacao
+from .senha import gerar_hash
 
 _FORMATO_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 TAMANHO_MINIMO_SENHA = 8
@@ -30,7 +31,7 @@ class Usuario:
     cpf: str
     email: str
     telefone: str
-    senha: str
+    senha_hash: str
     perfil: Perfil
     ativo: bool = True
     id: int | None = None
@@ -46,7 +47,11 @@ class Usuario:
         senha: str,
         perfil: Perfil | str,
     ) -> Usuario:
-        """Cria um usuário válido ou lança ``ErroDeValidacao``."""
+        """Cria um usuário válido ou lança ``ErroDeValidacao``.
+
+        A senha é validada em texto puro e armazenada apenas como hash
+        (NF007) — a entidade nunca guarda a senha original.
+        """
         nome = _texto_obrigatorio(nome, "nome")
         cpf = _texto_obrigatorio(cpf, "cpf")
         email = _texto_obrigatorio(email, "email")
@@ -63,7 +68,7 @@ class Usuario:
             cpf=cpf,
             email=email,
             telefone=telefone,
-            senha=senha,
+            senha_hash=gerar_hash(senha),
             perfil=_perfil_valido(perfil),
         )
 

@@ -42,7 +42,7 @@ def gerenciador_com_usuario(gerenciador: GerenciadorDeUsuarios) -> GerenciadorDe
         cpf="12345678901",
         email="ana@ubs.gov.br",
         telefone="84999990000",
-        senha="SenhaSecreta1!",
+        senha="Senha123!!",
         perfil=Perfil.MEDICO,
     )
     return gerenciador
@@ -56,7 +56,7 @@ def test_autentica_usuario_com_credenciais_validas(gerenciador_com_usuario):
     """Caminho feliz: credenciais corretas devolvem o usuário autenticado."""
     usuario = gerenciador_com_usuario.autenticar(
         email="ana@ubs.gov.br",
-        senha="SenhaSecreta1!",
+        senha="Senha123!!",
     )
 
     assert usuario.nome == "Ana Souza"
@@ -97,7 +97,7 @@ def test_rejeita_login_quando_email_nao_cadastrado(gerenciador_com_usuario):
     with pytest.raises(CredenciaisInvalidas):
         gerenciador_com_usuario.autenticar(
             email="inexistente@ubs.gov.br",
-            senha="senha_secreta",
+            senha="Senha123!!",
         )
 
 
@@ -140,7 +140,7 @@ def test_rejeita_login_quando_usuario_inativo(gerenciador_com_usuario):
     with pytest.raises(UsuarioInativo):
         gerenciador_com_usuario.autenticar(
             email="ana@ubs.gov.br",
-            senha="senha_secreta",
+            senha="Senha123!!",
         )
 
 
@@ -153,7 +153,7 @@ def test_usuario_inativo_e_subtipo_de_erro_de_autenticacao(gerenciador_com_usuar
     with pytest.raises(ErroDeAutenticacao):
         gerenciador_com_usuario.autenticar(
             email="ana@ubs.gov.br",
-            senha="senha_secreta",
+            senha="Senha123!!",
         )
 
 
@@ -170,5 +170,5 @@ def test_usuario_inativo_nao_lanca_credenciais_invalidas(gerenciador_com_usuario
     with pytest.raises(UsuarioInativo):
         gerenciador_com_usuario.autenticar(
             email="ana@ubs.gov.br",
-            senha="senha_secreta",
+            senha="Senha123!!",
         )
