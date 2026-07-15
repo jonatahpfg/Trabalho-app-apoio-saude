@@ -3,16 +3,25 @@
 from __future__ import annotations
 
 from ..dominio.erros import CpfDuplicado, CredenciaisInvalidas, ErroDeValidacao, UsuarioInativo
+from ..dominio.registro_de_acesso import RegistroDeAcesso
 from ..dominio.senha import verificar
 from ..dominio.usuario import Perfil, Usuario
+from ..portas.repositorio_registro_de_acesso import RepositorioRegistroDeAcesso
 from ..portas.repositorio_usuario import RepositorioUsuario
 
 
 class GerenciadorDeUsuarios:
     """Orquestra a adição, a listagem e a autenticação de usuários."""
 
-    def __init__(self, repositorio: RepositorioUsuario) -> None:
+    def __init__(
+        self,
+        repositorio: RepositorioUsuario,
+        repositorio_acessos: RepositorioRegistroDeAcesso | None = None,
+    ) -> None:
         self._repositorio = repositorio
+        # Porta opcional: sem ela o gerenciador funciona normalmente,
+        # apenas não gera estatísticas de acesso.
+        self._repositorio_acessos = repositorio_acessos
 
     def adicionar_usuario(
         self,
@@ -43,6 +52,9 @@ class GerenciadorDeUsuarios:
 
     def autenticar(self, *, email: str, senha: str) -> Usuario:
         """Valida credenciais e devolve o usuário autenticado.
+
+        Quando a porta de acessos está configurada, cada tentativa real de
+        login (sucesso ou falha) é registrada para as estatísticas de acesso.
 
         Aplica as boas práticas dos artigos do professor:
 
@@ -76,6 +88,7 @@ class GerenciadorDeUsuarios:
         # A comparação é feita contra o hash (NF007): a senha em texto puro
         # nunca é armazenada nem comparada diretamente.
         if usuario is None or not verificar(senha, usuario.senha_hash):
+            self._registrar_acesso(email, sucesso=False)
             raise CredenciaisInvalidas(
                 "E-mail ou senha incorretos."
             )
@@ -84,8 +97,22 @@ class GerenciadorDeUsuarios:
         # UsuarioInativo é separado de CredenciaisInvalidas porque a ação
         # corretiva é diferente: reativar a conta, não redefinir a senha.
         if not usuario.ativo:
+            self._registrar_acesso(email, sucesso=False)
             raise UsuarioInativo(
                 f"A conta do usuário '{usuario.nome}' está desativada."
             )
 
+        self._registrar_acesso(email, sucesso=True)
         return usuario
+
+    def _registrar_acesso(self, email: str, *, sucesso: bool) -> None:
+        """Registra a tentativa de login para as estatísticas de acesso.
+
+        Tentativas barradas nas pré-condições (campos em branco) não são
+        registradas: não chegam a ser uma tentativa real de autenticação.
+        """
+        if self._repositorio_acessos is None:
+            return
+        self._repositorio_acessos.salvar(
+            RegistroDeAcesso.criar(email=email, sucesso=sucesso)
+        )
