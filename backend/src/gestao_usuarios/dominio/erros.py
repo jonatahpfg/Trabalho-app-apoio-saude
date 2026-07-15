@@ -94,3 +94,16 @@ class ErroDeAcessoAoBanco(ErroDePersistencia):
     detalhes de implementação (Taborda: o nome da exceção deve revelar o
     problema, mas não detalhes técnicos desnecessários).
     """
+
+
+# ---------------------------------------------------------------------------
+# Exceções de Unidade Básica de Saúde
+# ---------------------------------------------------------------------------
+
+
+class CnpjDuplicado(ErroDeDominio):
+    """Já existe uma unidade cadastrada com o mesmo CNPJ."""
+
+
+class UnidadeNaoEncontrada(ErroDeDominio):
+    """Unidade Básica de Saúde não encontrada com o identificador informado."""
