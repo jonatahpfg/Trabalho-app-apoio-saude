@@ -15,7 +15,6 @@ from gestao_usuarios.dominio.erros import (
     CpfDuplicado,
     CredenciaisInvalidas,
     ErroDeValidacao,
-    UsuarioInativo,
 )
 from gestao_usuarios.dominio.usuario import Perfil
 

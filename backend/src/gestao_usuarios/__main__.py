@@ -12,9 +12,16 @@ import os
 import sys
 
 # Importar o novo repositório de banco de dados e as exceções
+from .adaptadores.adaptador_arquivo_de_log import AdaptadorArquivoDeLog
+from .adaptadores.arquivo_de_log_simples import ArquivoDeLogSimples
+from .adaptadores.repositorio_registro_de_acesso_em_memoria import (
+    RepositorioRegistroDeAcessoEmMemoria,
+)
 from .adaptadores.repositorio_usuario_em_memoria import RepositorioUsuarioEmMemoria
 from .adaptadores.repositorio_usuario_banco_de_dados import RepositorioUsuarioBancoDeDados
 from .aplicacao.gerenciador_de_usuarios import GerenciadorDeUsuarios
+from .aplicacao.relatorio_de_acessos_csv import RelatorioDeAcessosCsv
+from .aplicacao.relatorio_de_acessos_texto import RelatorioDeAcessosTexto
 from .dominio.erros import (
     CpfDuplicado,
     CredenciaisInvalidas,
@@ -29,16 +36,19 @@ def main() -> None:
     # Define 'memoria' como padrão. Se for definido como 'bd', usa SQLite.
     tipo_armazenamento = os.environ.get("STORAGE_TYPE", "memoria").lower()
 
-    if tipo_armazenamento == "bd": # Essa estrutura de if/else depois vou trocar para uma estrutura com polimorfismo, 
+    if tipo_armazenamento == "bd": # Essa estrutura de if/else depois vou trocar para uma estrutura com polimorfismo,
                                    # mas por enquanto é a forma mais simples de demonstrar o chaveamento de persistência. (Flavio)
-        print("-> Inicializando armazenamento em Banco de Dados (SQLite)...") 
+        print("-> Inicializando armazenamento em Banco de Dados (SQLite)...")
         # Cria ou abre o arquivo local 'usuarios.db'
         repositorio = RepositorioUsuarioBancoDeDados("usuarios.db")
+        # Adapter (Tarefa 5): o log de linhas de texto atende a porta de acessos
+        repositorio_acessos = AdaptadorArquivoDeLog(ArquivoDeLogSimples("acessos.log"))
     else:
         print("-> Inicializando armazenamento em Memória (RAM)...")
         repositorio = RepositorioUsuarioEmMemoria()
+        repositorio_acessos = RepositorioRegistroDeAcessoEmMemoria()
 
-    gerenciador = GerenciadorDeUsuarios(repositorio)
+    gerenciador = GerenciadorDeUsuarios(repositorio, repositorio_acessos)
 
     # 2. Tratamento de Exceções de Persistência/Banco de Dados ao salvar
     try:
@@ -90,6 +100,13 @@ def main() -> None:
         gerenciador.autenticar(email="naoexiste@ubs.gov.br", senha="qualquer")
     except CredenciaisInvalidas as e:
         print(f"CredenciaisInvalidas: {e}")
+
+    # Template Method (Tarefa 5): mesmo esqueleto de relatório, formatos diferentes
+    print("\n--- Relatório de estatísticas de acesso (texto) ---")
+    print(RelatorioDeAcessosTexto(repositorio_acessos).gerar())
+
+    print("\n--- Relatório de estatísticas de acesso (CSV) ---")
+    print(RelatorioDeAcessosCsv(repositorio_acessos).gerar())
 
 
 if __name__ == "__main__":
