@@ -236,7 +236,93 @@ classDiagram
 
 ---
 
-## 3. Rastreabilidade
+## 3. Tarefa 5 — Padrões Adapter e Template Method (estatísticas de acesso)
+
+Cada tentativa de autenticação passa a ser registrada como `RegistroDeAcesso`
+pela porta `RepositorioRegistroDeAcesso`, e os relatórios de estatísticas são
+gerados por um **Template Method** que funciona sobre qualquer adaptador da
+porta — inclusive o **Adapter** de arquivo de log.
+
+```mermaid
+classDiagram
+    %% ---------- Núcleo ----------
+    class GerenciadorDeUsuarios {
+        <<Control>>
+        -repositorio: RepositorioUsuario
+        -repositorioAcessos: RepositorioRegistroDeAcesso
+        +autenticar(email, senha) Usuario
+    }
+
+    class RegistroDeAcesso {
+        <<Entity>>
+        +id: int
+        +email: string
+        +sucesso: boolean
+        +dataHora: DateTime
+        +criar(dados) RegistroDeAcesso
+    }
+
+    class RepositorioRegistroDeAcesso {
+        <<interface>>
+        +salvar(registro) RegistroDeAcesso
+        +buscarTodos() List~RegistroDeAcesso~
+    }
+
+    %% ---------- Padrão Adapter ----------
+    class RepositorioRegistroDeAcessoEmMemoria {
+        <<Adapter>>
+    }
+
+    class AdaptadorArquivoDeLog {
+        <<Adapter GoF>>
+        +salvar(registro) RegistroDeAcesso
+        +buscarTodos() List~RegistroDeAcesso~
+    }
+
+    class ArquivoDeLogSimples {
+        <<Adaptee>>
+        +anotar(linha)
+        +lerLinhas() List~string~
+    }
+
+    %% ---------- Padrão Template Method ----------
+    class RelatorioDeAcessos {
+        <<abstract>>
+        +gerar() string
+        #calcularEstatisticas(registros) EstatisticasDeAcesso
+        #cabecalho()* string
+        #linhaPorEmail(estatistica)* string
+        #rodape(estatisticas)* string
+    }
+
+    class RelatorioDeAcessosTexto
+    class RelatorioDeAcessosCsv
+
+    %% ---------- Relações ----------
+    GerenciadorDeUsuarios ..> RepositorioRegistroDeAcesso : usa «porta»
+    GerenciadorDeUsuarios ..> RegistroDeAcesso : cria
+
+    RepositorioRegistroDeAcesso <|.. RepositorioRegistroDeAcessoEmMemoria
+    RepositorioRegistroDeAcesso <|.. AdaptadorArquivoDeLog
+    AdaptadorArquivoDeLog --> ArquivoDeLogSimples : adapta
+
+    RelatorioDeAcessos ..> RepositorioRegistroDeAcesso : usa «porta»
+    RelatorioDeAcessos <|-- RelatorioDeAcessosTexto
+    RelatorioDeAcessos <|-- RelatorioDeAcessosCsv
+```
+
+> [!NOTE]
+> **Adapter (GoF):** `AdaptadorArquivoDeLog` (Adapter) traduz `RegistroDeAcesso` de/para
+> linhas de texto, permitindo que `ArquivoDeLogSimples` (Adaptee, interface incompatível)
+> atenda à porta `RepositorioRegistroDeAcesso` (Target).
+>
+> **Template Method (GoF):** `RelatorioDeAcessos.gerar()` fixa o esqueleto do algoritmo
+> (coletar → calcular estatísticas → cabeçalho/corpo/rodapé); as concretas implementam
+> apenas os hooks de formatação (`*` = abstrato).
+
+---
+
+## 4. Rastreabilidade
 
 | Caso de uso / item técnico      | Requisito / Laboratório  | Entrega          |
 | ------------------------------- | ------------------------ | ---------------- |
@@ -251,3 +337,6 @@ classDiagram
 | Tratar Erros de Persistência    | Sprint 2                    | Sprint 2            |
 | Ativar / Desativar Usuário      | RF01 / RF02              | futura           |
 | Consultar Próprio Cadastro      | RF Médico                | futura           |
+| Registrar Acessos (autenticação) | Tarefa 5 / NF011-C      | Tarefa 5         |
+| Adapter de Log de Acessos       | Tarefa 5 (padrão Adapter) | Tarefa 5        |
+| Relatórios de Estatísticas      | Tarefa 5 (Template Method) | Tarefa 5       |
