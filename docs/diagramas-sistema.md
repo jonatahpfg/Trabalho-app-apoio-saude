@@ -322,7 +322,179 @@ classDiagram
 
 ---
 
-## 4. Rastreabilidade
+## 4. Sprint 3 — Padrões Facade + Singleton e CRUD de Unidade Básica de Saúde
+
+### 4.1 Nova entidade: UnidadeBasicaSaude
+
+A Sprint 3 introduz o cadastro (CRUD) da entidade **UnidadeBasicaSaude** (UBS),
+que possui relacionamento indireto com **Usuario** — os perfis Gestor e Médico
+estão vinculados a uma unidade de saúde. A entidade segue as mesmas invariantes
+do domínio: validação de campos obrigatórios e validação de formato de CNPJ.
+
+### 4.2 Padrões Singleton e Facade: FacadeSingletonController
+
+A classe `FacadeSingletonController` aplica dois padrões GoF simultaneamente:
+
+- **Singleton:** garante que exista uma única instância por processo, criada
+  sob demanda (*lazy initialization*) na primeira chamada ao método de classe
+  `instancia()`. O atributo de classe `_instancia_unica` armazena a referência.
+
+- **Facade:** expõe uma interface simplificada que esconde a montagem interna
+  dos dois gerenciadores (`GerenciadorDeUsuarios` e `GerenciadorDeUnidades`)
+  e seus respectivos repositórios. O cliente da fachada não precisa conhecer
+  a arquitetura interna — basta chamar métodos como `adicionar_usuario()`,
+  `adicionar_unidade()` ou `obter_quantidade_total_entidades_cadastradas()`.
+
+O método `obter_quantidade_total_entidades_cadastradas()` retorna a soma de
+todas as entidades (usuários + unidades) persistidas no sistema, conforme
+exigido pela atividade da Sprint 3.
+
+O arquivo PlantUML do diagrama atualizado está disponível em:
+[`diagrama-classes-v2.puml`](diagrama-classes-v2.puml)
+
+```mermaid
+classDiagram
+    %% ---------- Padrão Facade + Singleton ----------
+    class FacadeSingletonController {
+        <<Facade>>
+        <<Singleton>>
+        -{static} _instancia_unica: FacadeSingletonController
+        -_gerenciador_usuarios: GerenciadorDeUsuarios
+        -_gerenciador_unidades: GerenciadorDeUnidades
+        +{static} instancia() FacadeSingletonController
+        +{static} resetar_instancia()
+        +obter_quantidade_total_entidades_cadastradas() int
+        +adicionar_usuario(…) Usuario
+        +listar_usuarios() List~Usuario~
+        +autenticar(email, senha) Usuario
+        +adicionar_unidade(…) UnidadeBasicaSaude
+        +listar_unidades(apenas_ativas) List~UnidadeBasicaSaude~
+        +buscar_unidade_por_id(id) UnidadeBasicaSaude
+        +atualizar_unidade(…) UnidadeBasicaSaude
+        +remover_unidade(id) UnidadeBasicaSaude
+    }
+
+    %% ---------- Gerenciadores (Controllers) ----------
+    class GerenciadorDeUsuarios {
+        <<Control>>
+        -repositorio: RepositorioUsuario
+        -repositorio_acessos: RepositorioRegistroDeAcesso
+        +adicionar_usuario(…) Usuario
+        +listar_usuarios() List~Usuario~
+        +autenticar(email, senha) Usuario
+    }
+
+    class GerenciadorDeUnidades {
+        <<Control>>
+        -repositorio: RepositorioUnidadeBasicaSaude
+        +adicionar_unidade(…) UnidadeBasicaSaude
+        +listar_unidades(apenas_ativas) List~UnidadeBasicaSaude~
+        +buscar_unidade_por_id(id) UnidadeBasicaSaude
+        +atualizar_unidade(…) UnidadeBasicaSaude
+        +remover_unidade(id) UnidadeBasicaSaude
+    }
+
+    %% ---------- Portas secundárias ----------
+    class RepositorioUsuario {
+        <<interface>>
+        +salvar(usuario) Usuario
+        +buscar_todos() List~Usuario~
+        +buscar_por_cpf(cpf) Usuario
+        +buscar_por_email(email) Usuario
+    }
+
+    class RepositorioUnidadeBasicaSaude {
+        <<interface>>
+        +salvar(unidade) UnidadeBasicaSaude
+        +buscar_todas() List~UnidadeBasicaSaude~
+        +buscar_por_id(id) UnidadeBasicaSaude
+        +buscar_por_cnpj(cnpj) UnidadeBasicaSaude
+    }
+
+    %% ---------- Entidades ----------
+    class Usuario {
+        <<Entity>>
+        +id: int
+        +nome: string
+        +cpf: string
+        +email: string
+        +telefone: string
+        +senha_hash: string
+        +perfil: Perfil
+        +ativo: boolean
+        +criar(dados) Usuario
+    }
+
+    class Perfil {
+        <<enumeration>>
+        ADMINISTRADOR
+        GESTOR
+        MEDICO
+    }
+
+    class UnidadeBasicaSaude {
+        <<Entity>>
+        +id: int
+        +nome: string
+        +cnpj: string
+        +endereco: string
+        +telefone: string
+        +ativa: boolean
+        +criar(dados) UnidadeBasicaSaude
+    }
+
+    %% ---------- Adaptadores ----------
+    class RepositorioUsuarioEmMemoria {
+        <<Adapter>>
+    }
+    class RepositorioUsuarioBancoDeDados {
+        <<Adapter>>
+    }
+    class RepositorioUnidadeEmMemoria {
+        <<Adapter>>
+    }
+
+    %% ---------- Exceções ----------
+    class CnpjDuplicado {
+        <<Exception>>
+    }
+    class UnidadeNaoEncontrada {
+        <<Exception>>
+    }
+
+    %% ---------- Relações ----------
+    FacadeSingletonController --> GerenciadorDeUsuarios : delega
+    FacadeSingletonController --> GerenciadorDeUnidades : delega
+
+    GerenciadorDeUsuarios ..> RepositorioUsuario : usa «porta»
+    GerenciadorDeUsuarios ..> Usuario : cria / consulta
+    GerenciadorDeUnidades ..> RepositorioUnidadeBasicaSaude : usa «porta»
+    GerenciadorDeUnidades ..> UnidadeBasicaSaude : cria / consulta
+
+    RepositorioUsuario <|.. RepositorioUsuarioEmMemoria
+    RepositorioUsuario <|.. RepositorioUsuarioBancoDeDados
+    RepositorioUnidadeBasicaSaude <|.. RepositorioUnidadeEmMemoria
+
+    Usuario --> Perfil : possui
+
+    GerenciadorDeUnidades ..> CnpjDuplicado : lança
+    GerenciadorDeUnidades ..> UnidadeNaoEncontrada : lança
+```
+
+> [!NOTE]
+> **Singleton:** `FacadeSingletonController.instancia()` é o único ponto de acesso.
+> A construção direta (`__init__`) continua pública para facilitar testes com
+> repositórios injetados, mas em produção deve-se usar sempre `instancia()`.
+>
+> **Facade:** o cliente da fachada não precisa conhecer `GerenciadorDeUsuarios`
+> nem `GerenciadorDeUnidades` — toda a orquestração interna está encapsulada.
+>
+> **Contagem de entidades:** `obter_quantidade_total_entidades_cadastradas()`
+> soma usuários e unidades persistidos, conforme exigido pela Sprint 3.
+
+---
+
+## 5. Rastreabilidade
 
 | Caso de uso / item técnico      | Requisito / Laboratório  | Entrega          |
 | ------------------------------- | ------------------------ | ---------------- |
@@ -340,3 +512,8 @@ classDiagram
 | Registrar Acessos (autenticação) | Tarefa 5 / NF011-C      | Tarefa 5         |
 | Adapter de Log de Acessos       | Tarefa 5 (padrão Adapter) | Tarefa 5        |
 | Relatórios de Estatísticas      | Tarefa 5 (Template Method) | Tarefa 5       |
+| CRUD Unidade Básica de Saúde    | Sprint 3 (nova entidade)  | Sprint 3        |
+| Facade + Singleton Controller   | Sprint 3 (Padrões GoF)   | Sprint 3         |
+| Contagem total de entidades     | Sprint 3 (método Facade)  | Sprint 3        |
+| Diagrama de classes atualizado  | Sprint 3 (diagrama v2)   | Sprint 3         |
+

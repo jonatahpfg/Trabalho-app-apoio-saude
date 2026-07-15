@@ -1,5 +1,5 @@
 @startuml
-title Diagrama de Classes - Nova Esquematização com Facade e Paciente
+title Diagrama de Classes — Sprint 3: Padrões Facade + Singleton (UnidadeBasicaSaude)
 
 skinparam classAttributeIconSize 0
 
@@ -10,11 +10,10 @@ package "dominio" {
         - cpf: str
         - email: str
         - telefone: str
-        - login: str
-        - senha: str
+        - senha_hash: str
         - perfil: Perfil
         - ativo: bool
-        + criar(nome, cpf, email, telefone, login, senha, perfil): Usuario
+        + criar(nome, cpf, email, telefone, senha, perfil): Usuario
     }
 
     enum Perfil {
@@ -23,35 +22,52 @@ package "dominio" {
         MEDICO
     }
 
-    class Paciente {
+    class UnidadeBasicaSaude {
         - id: int | None
         - nome: str
-        - cpf: str
-        - data_nascimento: date
+        - cnpj: str
+        - endereco: str
         - telefone: str
-        - ativo: bool
-        + criar(nome, cpf, data_nascimento, telefone): Paciente
+        - ativa: bool
+        + criar(nome, cnpj, endereco, telefone): UnidadeBasicaSaude
+    }
+
+    class RegistroDeAcesso {
+        - id: int | None
+        - email: str
+        - sucesso: bool
+        - data_hora: datetime
+        + criar(email, sucesso): RegistroDeAcesso
+    }
+
+    class Senha <<utility>> {
+        + {static} gerar_hash(senha): str
+        + {static} verificar(senha, hash): bool
     }
 
     ' Tratamento de Erros e Exceções
-    class ErroDeDominio
-    class ErroDeValidacao
-    class CpfDuplicado
-    class ErroDePersistencia
-    
-    ' Novas Exceções
-    class PacienteNaoEncontrado
-    class UsuarioNaoEncontrado
-    class AcessoNegado
-    class IdadeInvalida
+    class ErroDeDominio <<Exception>>
+    class ErroDeValidacao <<Exception>>
+    class CpfDuplicado <<Exception>>
+    class CnpjDuplicado <<Exception>>
+    class UnidadeNaoEncontrada <<Exception>>
+    class ErroDePersistencia <<Exception>>
+    class ErroDeAcessoAoArquivo <<Exception>>
+    class ErroDeAcessoAoBanco <<Exception>>
+    class ErroDeAutenticacao <<Exception>>
+    class CredenciaisInvalidas <<Exception>>
+    class UsuarioInativo <<Exception>>
 
     ErroDeDominio <|-- ErroDeValidacao
     ErroDeDominio <|-- CpfDuplicado
+    ErroDeDominio <|-- CnpjDuplicado
+    ErroDeDominio <|-- UnidadeNaoEncontrada
     ErroDeDominio <|-- ErroDePersistencia
-    ErroDeDominio <|-- PacienteNaoEncontrado
-    ErroDeDominio <|-- UsuarioNaoEncontrado
-    ErroDeDominio <|-- AcessoNegado
-    ErroDeValidacao <|-- IdadeInvalida
+    ErroDeDominio <|-- ErroDeAutenticacao
+    ErroDePersistencia <|-- ErroDeAcessoAoArquivo
+    ErroDePersistencia <|-- ErroDeAcessoAoBanco
+    ErroDeAutenticacao <|-- CredenciaisInvalidas
+    ErroDeAutenticacao <|-- UsuarioInativo
 
     Usuario --> Perfil
 }
@@ -61,48 +77,77 @@ package "portas" {
         + salvar(usuario: Usuario): Usuario
         + buscar_todos(): list<Usuario>
         + buscar_por_cpf(cpf: str): Usuario | None
-        + buscar_por_id(id: int): Usuario | None
+        + buscar_por_email(email: str): Usuario | None
     }
 
-    interface RepositorioPaciente {
-        + salvar(paciente: Paciente): Paciente
-        + buscar_todos(): list<Paciente>
-        + buscar_por_cpf(cpf: str): Paciente | None
-        + buscar_por_id(id: int): Paciente | None
+    interface RepositorioUnidadeBasicaSaude {
+        + salvar(unidade: UnidadeBasicaSaude): UnidadeBasicaSaude
+        + buscar_todas(): list<UnidadeBasicaSaude>
+        + buscar_por_id(id: int): UnidadeBasicaSaude | None
+        + buscar_por_cnpj(cnpj: str): UnidadeBasicaSaude | None
+    }
+
+    interface RepositorioRegistroDeAcesso {
+        + salvar(registro: RegistroDeAcesso): RegistroDeAcesso
+        + buscar_todos(): list<RegistroDeAcesso>
     }
 }
 
 package "aplicacao" {
     class GerenciadorDeUsuarios {
         - repositorio: RepositorioUsuario
-        + adicionar_usuario(nome, cpf, email, telefone, login, senha, perfil): Usuario
+        - repositorio_acessos: RepositorioRegistroDeAcesso
+        + adicionar_usuario(nome, cpf, email, telefone, senha, perfil): Usuario
         + listar_usuarios(): list<Usuario>
-        + buscar_usuario(id: int): Usuario
+        + autenticar(email, senha): Usuario
     }
 
-    class GerenciadorDePacientes {
-        - repositorio: RepositorioPaciente
-        + adicionar_paciente(nome, cpf, data_nascimento, telefone): Paciente
-        + listar_pacientes(): list<Paciente>
-        + buscar_paciente(id: int): Paciente
+    class GerenciadorDeUnidades {
+        - repositorio: RepositorioUnidadeBasicaSaude
+        + adicionar_unidade(nome, cnpj, endereco, telefone): UnidadeBasicaSaude
+        + listar_unidades(apenas_ativas): list<UnidadeBasicaSaude>
+        + buscar_unidade_por_id(id): UnidadeBasicaSaude
+        + atualizar_unidade(id, nome, cnpj, endereco, telefone): UnidadeBasicaSaude
+        + remover_unidade(id): UnidadeBasicaSaude
     }
 
     class FacadeSingletonController <<Facade>> <<Singleton>> {
-        - {static} instancia: FacadeSingletonController
-        - gerenciador_usuarios: GerenciadorDeUsuarios
-        - gerenciador_pacientes: GerenciadorDePacientes
-        
-        - FacadeSingletonController()
-        + {static} get_instance(): FacadeSingletonController
-        
+        - {static} _instancia_unica: FacadeSingletonController
+        - _gerenciador_usuarios: GerenciadorDeUsuarios
+        - _gerenciador_unidades: GerenciadorDeUnidades
+
+        + {static} instancia(): FacadeSingletonController
+        + {static} resetar_instancia(): void
+
         + obter_quantidade_total_entidades_cadastradas(): int
-        
-        ' Delegações
-        + adicionar_usuario(...)
-        + adicionar_paciente(...)
+
+        ' Delegações — Usuários
+        + adicionar_usuario(...): Usuario
         + listar_usuarios(): list<Usuario>
-        + listar_pacientes(): list<Paciente>
+        + autenticar(email, senha): Usuario
+
+        ' Delegações — Unidades
+        + adicionar_unidade(...): UnidadeBasicaSaude
+        + listar_unidades(apenas_ativas): list<UnidadeBasicaSaude>
+        + buscar_unidade_por_id(id): UnidadeBasicaSaude
+        + atualizar_unidade(...): UnidadeBasicaSaude
+        + remover_unidade(id): UnidadeBasicaSaude
     }
+
+    ' Padrão Template Method — Relatórios de Acessos
+    abstract class RelatorioDeAcessos <<abstract>> {
+        + gerar(): string
+        # calcularEstatisticas(registros): EstatisticasDeAcesso
+        # {abstract} cabecalho(): string
+        # {abstract} linhaPorEmail(estatistica): string
+        # {abstract} rodape(estatisticas): string
+    }
+
+    class RelatorioDeAcessosTexto
+    class RelatorioDeAcessosCsv
+
+    RelatorioDeAcessos <|-- RelatorioDeAcessosTexto
+    RelatorioDeAcessos <|-- RelatorioDeAcessosCsv
 }
 
 package "adaptadores" {
@@ -112,50 +157,80 @@ package "adaptadores" {
         + salvar(usuario: Usuario): Usuario
         + buscar_todos(): list<Usuario>
         + buscar_por_cpf(cpf: str): Usuario | None
-        + buscar_por_id(id: int): Usuario | None
+        + buscar_por_email(email: str): Usuario | None
     }
 
-    class RepositorioUsuarioArquivoBinario {
-        - caminho_arquivo: str
+    class RepositorioUsuarioBancoDeDados {
+        - caminho_db: str
         + salvar(usuario: Usuario): Usuario
         + buscar_todos(): list<Usuario>
         + buscar_por_cpf(cpf: str): Usuario | None
-        + buscar_por_id(id: int): Usuario | None
+        + buscar_por_email(email: str): Usuario | None
     }
 
-    class RepositorioPacienteEmMemoria {
-        - pacientes: dict<int, Paciente>
+    class RepositorioUnidadeEmMemoria {
+        - unidades: dict<int, UnidadeBasicaSaude>
         - proximo_id: int
-        + salvar(paciente: Paciente): Paciente
-        + buscar_todos(): list<Paciente>
-        + buscar_por_cpf(cpf: str): Paciente | None
-        + buscar_por_id(id: int): Paciente | None
+        + salvar(unidade: UnidadeBasicaSaude): UnidadeBasicaSaude
+        + buscar_todas(): list<UnidadeBasicaSaude>
+        + buscar_por_id(id: int): UnidadeBasicaSaude | None
+        + buscar_por_cnpj(cnpj: str): UnidadeBasicaSaude | None
+    }
+
+    class RepositorioRegistroDeAcessoEmMemoria {
+        + salvar(registro: RegistroDeAcesso): RegistroDeAcesso
+        + buscar_todos(): list<RegistroDeAcesso>
+    }
+
+    ' Padrão Adapter GoF
+    class AdaptadorArquivoDeLog <<Adapter GoF>> {
+        + salvar(registro: RegistroDeAcesso): RegistroDeAcesso
+        + buscar_todos(): list<RegistroDeAcesso>
+    }
+
+    class ArquivoDeLogSimples <<Adaptee>> {
+        + anotar(linha): void
+        + ler_linhas(): list<string>
     }
 }
 
-' Relacionamentos Estruturais
+' --- Relacionamentos Estruturais ---
+
+' Facade delega para os gerenciadores
 FacadeSingletonController --> GerenciadorDeUsuarios : delega
-FacadeSingletonController --> GerenciadorDePacientes : delega
+FacadeSingletonController --> GerenciadorDeUnidades : delega
 
+' Gerenciadores dependem das portas
 GerenciadorDeUsuarios --> RepositorioUsuario
-GerenciadorDePacientes --> RepositorioPaciente
+GerenciadorDeUsuarios ..> RepositorioRegistroDeAcesso : usa «porta opcional»
+GerenciadorDeUnidades --> RepositorioUnidadeBasicaSaude
 
+' Relatórios dependem da porta de acessos
+RelatorioDeAcessos ..> RepositorioRegistroDeAcesso : usa «porta»
+
+' Adaptadores implementam as portas
 RepositorioUsuario <|.. RepositorioUsuarioEmMemoria
-RepositorioUsuario <|.. RepositorioUsuarioArquivoBinario
+RepositorioUsuario <|.. RepositorioUsuarioBancoDeDados
 
-RepositorioPaciente <|.. RepositorioPacienteEmMemoria
+RepositorioUnidadeBasicaSaude <|.. RepositorioUnidadeEmMemoria
+
+RepositorioRegistroDeAcesso <|.. RepositorioRegistroDeAcessoEmMemoria
+RepositorioRegistroDeAcesso <|.. AdaptadorArquivoDeLog
+AdaptadorArquivoDeLog --> ArquivoDeLogSimples : adapta
 
 ' Dependências de Entidades
 RepositorioUsuario --> Usuario
-RepositorioPaciente --> Paciente
+RepositorioUnidadeBasicaSaude --> UnidadeBasicaSaude
+RepositorioRegistroDeAcesso --> RegistroDeAcesso
 
 ' Dependências de Exceções
-GerenciadorDeUsuarios ..> CpfDuplicado
-GerenciadorDeUsuarios ..> UsuarioNaoEncontrado
-GerenciadorDePacientes ..> CpfDuplicado
-GerenciadorDePacientes ..> PacienteNaoEncontrado
-FacadeSingletonController ..> AcessoNegado
-Paciente ..> IdadeInvalida
-Usuario ..> ErroDeValidacao
+GerenciadorDeUsuarios ..> CpfDuplicado : lança
+GerenciadorDeUsuarios ..> CredenciaisInvalidas : lança
+GerenciadorDeUsuarios ..> UsuarioInativo : lança
+GerenciadorDeUnidades ..> CnpjDuplicado : lança
+GerenciadorDeUnidades ..> UnidadeNaoEncontrada : lança
+Usuario ..> ErroDeValidacao : lança
+UnidadeBasicaSaude ..> ErroDeValidacao : lança
+RepositorioUsuarioBancoDeDados ..> ErroDeAcessoAoBanco : lança
 
 @enduml
