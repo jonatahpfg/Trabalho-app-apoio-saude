@@ -1,0 +1,186 @@
+@startuml
+title Diagrama Final de Classes — Sprint 4: Padrões GoF e Repository
+
+skinparam classAttributeIconSize 0
+
+package "dominio" {
+    class Usuario <<Entity>> {
+        - id: int | None
+        - nome: str
+        - cpf: str
+        - email: str
+        - telefone: str
+        - senha_hash: str
+        - perfil: Perfil
+        - ativo: bool
+        + criar(...): Usuario
+    }
+
+    enum Perfil {
+        ADMINISTRADOR
+        GESTOR
+        MEDICO
+    }
+
+    class UnidadeBasicaSaude <<Entity>> {
+        - id: int | None
+        - nome: str
+        - cnpj: str
+        - endereco: str
+        - telefone: str
+        - ativa: bool
+        + criar(...): UnidadeBasicaSaude
+    }
+
+    class RegistroDeAcesso <<Entity>> {
+        - id: int | None
+        - email: str
+        - sucesso: bool
+        - data_hora: datetime
+        + criar(...): RegistroDeAcesso
+    }
+
+    Usuario --> Perfil
+}
+
+package "portas" {
+    interface RepositorioUsuario <<Repository>> {
+        + salvar(usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_cpf(cpf): Usuario | None
+        + buscar_por_email(email): Usuario | None
+    }
+
+    interface RepositorioUnidadeBasicaSaude <<Repository>> {
+        + salvar(unidade): UnidadeBasicaSaude
+        + buscar_todas(): list<UnidadeBasicaSaude>
+        + buscar_por_id(id): UnidadeBasicaSaude | None
+        + buscar_por_cnpj(cnpj): UnidadeBasicaSaude | None
+    }
+
+    interface RepositorioRegistroDeAcesso <<Repository>> {
+        + salvar(registro): RegistroDeAcesso
+        + buscar_todos(): list<RegistroDeAcesso>
+    }
+
+    interface FabricaRepositorio <<Abstract Factory>> {
+        + criar_repositorio_usuario(): RepositorioUsuario
+        + criar_repositorio_unidade_basica_saude(): RepositorioUnidadeBasicaSaude
+        + criar_repositorio_registro_de_acesso(): RepositorioRegistroDeAcesso
+    }
+}
+
+package "aplicacao / business" {
+    class GerenciadorDeUsuarios <<Control>> {
+        - repositorio: RepositorioUsuario
+        - repositorio_acessos: RepositorioRegistroDeAcesso
+        + adicionar_usuario(...): Usuario
+        + listar_usuarios(): list<Usuario>
+        + autenticar(email, senha): Usuario
+    }
+
+    class GerenciadorDeUnidades <<Control>> {
+        - repositorio: RepositorioUnidadeBasicaSaude
+        + adicionar_unidade(...): UnidadeBasicaSaude
+        + listar_unidades(apenas_ativas): list<UnidadeBasicaSaude>
+        + buscar_unidade_por_id(id): UnidadeBasicaSaude
+        + atualizar_unidade(...): UnidadeBasicaSaude
+        + remover_unidade(id): UnidadeBasicaSaude
+    }
+
+    class FacadeSingletonController <<Facade>> <<Singleton>> {
+        - {static} _instancia_unica: FacadeSingletonController
+        - _gerenciador_usuarios: GerenciadorDeUsuarios
+        - _gerenciador_unidades: GerenciadorDeUnidades
+        + {static} instancia(): FacadeSingletonController
+        + {static} resetar_instancia(): void
+        + adicionar_usuario(...): Usuario
+        + listar_usuarios(): list<Usuario>
+        + autenticar(email, senha): Usuario
+        + adicionar_unidade(...): UnidadeBasicaSaude
+        + listar_unidades(apenas_ativas): list<UnidadeBasicaSaude>
+        + buscar_unidade_por_id(id): UnidadeBasicaSaude
+        + atualizar_unidade(...): UnidadeBasicaSaude
+        + remover_unidade(id): UnidadeBasicaSaude
+        + obter_quantidade_total_entidades_cadastradas(): int
+    }
+
+    abstract class RelatorioDeAcessos <<Template Method>> {
+        + gerar(): str
+        # _calcular_estatisticas(registros): EstatisticasDeAcesso
+        # {abstract} _cabecalho(): str
+        # {abstract} _linha_por_email(estatistica): str
+        # {abstract} _rodape(estatisticas): str
+    }
+
+    class RelatorioDeAcessosTexto
+    class RelatorioDeAcessosCsv
+}
+
+package "adaptadores / infra" {
+    class RepositorioUsuarioEmMemoria <<Repository Adapter>>
+    class RepositorioUsuarioBancoDeDados <<Repository Adapter>>
+    class RepositorioUnidadeEmMemoria <<Repository Adapter>>
+    class RepositorioRegistroDeAcessoEmMemoria <<Repository Adapter>>
+
+    class FabricaRepositorioEmMemoria <<Concrete Factory>>
+    class FabricaRepositorioBancoDeDados <<Concrete Factory>>
+
+    class SeletorFabrica <<Factory Method>> {
+        + obter_fabrica_repositorio(tipo): FabricaRepositorio
+    }
+
+    class AdaptadorArquivoDeLog <<Adapter>> {
+        + salvar(registro): RegistroDeAcesso
+        + buscar_todos(): list<RegistroDeAcesso>
+    }
+
+    class ArquivoDeLogSimples <<Adaptee>> {
+        + anotar(linha): void
+        + ler_linhas(): list<string>
+    }
+}
+
+' -------------------- Relações principais --------------------
+
+FacadeSingletonController --> GerenciadorDeUsuarios : delega
+FacadeSingletonController --> GerenciadorDeUnidades : delega
+
+GerenciadorDeUsuarios ..> RepositorioUsuario : usa porta
+GerenciadorDeUsuarios ..> RepositorioRegistroDeAcesso : registra acessos
+GerenciadorDeUsuarios ..> Usuario : cria / autentica
+
+GerenciadorDeUnidades ..> RepositorioUnidadeBasicaSaude : usa porta
+GerenciadorDeUnidades ..> UnidadeBasicaSaude : CRUD
+
+RelatorioDeAcessos ..> RepositorioRegistroDeAcesso : coleta registros
+RelatorioDeAcessos <|-- RelatorioDeAcessosTexto
+RelatorioDeAcessos <|-- RelatorioDeAcessosCsv
+
+FabricaRepositorio <|.. FabricaRepositorioEmMemoria
+FabricaRepositorio <|.. FabricaRepositorioBancoDeDados
+SeletorFabrica ..> FabricaRepositorio : seleciona
+
+FabricaRepositorioEmMemoria ..> RepositorioUsuarioEmMemoria : cria
+FabricaRepositorioEmMemoria ..> RepositorioUnidadeEmMemoria : cria
+FabricaRepositorioEmMemoria ..> RepositorioRegistroDeAcessoEmMemoria : cria
+
+FabricaRepositorioBancoDeDados ..> RepositorioUsuarioBancoDeDados : cria
+FabricaRepositorioBancoDeDados ..> RepositorioUnidadeEmMemoria : cria
+FabricaRepositorioBancoDeDados ..> AdaptadorArquivoDeLog : cria
+
+RepositorioUsuario <|.. RepositorioUsuarioEmMemoria
+RepositorioUsuario <|.. RepositorioUsuarioBancoDeDados
+
+RepositorioUnidadeBasicaSaude <|.. RepositorioUnidadeEmMemoria
+
+RepositorioRegistroDeAcesso <|.. RepositorioRegistroDeAcessoEmMemoria
+RepositorioRegistroDeAcesso <|.. AdaptadorArquivoDeLog
+
+AdaptadorArquivoDeLog --> ArquivoDeLogSimples : adapta
+
+RepositorioUsuario ..> Usuario : persiste
+RepositorioUnidadeBasicaSaude ..> UnidadeBasicaSaude : persiste
+RepositorioRegistroDeAcesso ..> RegistroDeAcesso : persiste
+
+@enduml

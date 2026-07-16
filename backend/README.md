@@ -8,10 +8,27 @@ Backend em Python do App Experimental de Triagem em Saúde, organizado em
 
 ```
 src/gestao_usuarios/
-├── dominio/        entidades e regras (Usuario, Perfil, erros)
-├── portas/         contratos (RepositorioUsuario)
-├── aplicacao/      casos de uso (GerenciadorDeUsuarios)
-└── adaptadores/    implementações das portas (repositório em memória)
+├── dominio/        entidades e regras de negócio
+│   ├── Usuario
+│   ├── UnidadeBasicaSaude
+│   ├── RegistroDeAcesso
+│   ├── Perfil
+│   └── erros de domínio
+├── portas/         contratos da aplicação
+│   ├── RepositorioUsuario
+│   ├── RepositorioUnidadeBasicaSaude
+│   ├── RepositorioRegistroDeAcesso
+│   └── FabricaRepositorio
+├── aplicacao/      casos de uso e regras de aplicação
+│   ├── GerenciadorDeUsuarios
+│   ├── GerenciadorDeUnidades
+│   ├── FacadeSingletonController
+│   └── relatórios de acesso
+└── adaptadores/    implementações de infraestrutura
+    ├── repositórios em memória
+    ├── repositório SQLite de usuários
+    ├── fábricas concretas de repositórios
+    └── adapter de arquivo de log
 ```
 
 A dependência aponta sempre para dentro: adaptadores dependem do domínio, nunca o contrário.
