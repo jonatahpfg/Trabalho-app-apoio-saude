@@ -10,15 +10,14 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from ..adaptadores.repositorio_unidade_em_memoria import RepositorioUnidadeEmMemoria
-from ..adaptadores.repositorio_usuario_em_memoria import RepositorioUsuarioEmMemoria
-from ..adaptadores.repositorio_usuario_banco_de_dados import RepositorioUsuarioBancoDeDados
+from ..adaptadores.seletor_fabrica import obter_fabrica_repositorio
 from ..aplicacao.gerenciador_de_unidades import GerenciadorDeUnidades
 from ..aplicacao.gerenciador_de_usuarios import GerenciadorDeUsuarios
 from ..dominio.unidade_basica_saude import UnidadeBasicaSaude
 from ..dominio.usuario import Perfil, Usuario
 
 if TYPE_CHECKING:
+    from ..portas.repositorio_registro_de_acesso import RepositorioRegistroDeAcesso
     from ..portas.repositorio_unidade_basica_saude import RepositorioUnidadeBasicaSaude
     from ..portas.repositorio_usuario import RepositorioUsuario
 
@@ -44,32 +43,32 @@ class FacadeSingletonController:
         self,
         repositorio_usuarios: RepositorioUsuario,
         repositorio_unidades: RepositorioUnidadeBasicaSaude,
+        repositorio_acessos: RepositorioRegistroDeAcesso | None = None,
     ) -> None:
-        self._gerenciador_usuarios = GerenciadorDeUsuarios(repositorio_usuarios)
+        self._gerenciador_usuarios = GerenciadorDeUsuarios(repositorio_usuarios, repositorio_acessos)
         self._gerenciador_unidades = GerenciadorDeUnidades(repositorio_unidades)
 
     @classmethod
     def instancia(cls) -> FacadeSingletonController:
         """Ponto de acesso global à instância única (lazy initialization)."""
         if cls._instancia_unica is None:
-            repo_usuarios, repo_unidades = cls._criar_repositorios()
-            cls._instancia_unica = cls(repo_usuarios, repo_unidades)
+            repo_usuarios, repo_unidades, repo_acessos = cls._criar_repositorios()
+            cls._instancia_unica = cls(repo_usuarios, repo_unidades, repo_acessos)
         return cls._instancia_unica
 
     @classmethod
     def _criar_repositorios(
         cls,
-    ) -> tuple[RepositorioUsuario, RepositorioUnidadeBasicaSaude]:
-        """Escolhe os repositórios conforme a variável de ambiente STORAGE_TYPE."""
+    ) -> tuple[RepositorioUsuario, RepositorioUnidadeBasicaSaude, RepositorioRegistroDeAcesso]:
+        """Escolhe os repositórios utilizando a fábrica abstrata de persistência."""
         tipo = os.environ.get("STORAGE_TYPE", "memoria").lower()
-        if tipo == "bd":
-            repo_usuarios = RepositorioUsuarioBancoDeDados("usuarios.db")
-        else:
-            repo_usuarios = RepositorioUsuarioEmMemoria()
+        fabrica = obter_fabrica_repositorio(tipo)
 
-        # Para UBS usa-se memória por padrão (pode ser estendido no futuro)
-        repo_unidades = RepositorioUnidadeEmMemoria()
-        return repo_usuarios, repo_unidades
+        repo_usuarios = fabrica.criar_repositorio_usuario()
+        repo_unidades = fabrica.criar_repositorio_unidade_basica_saude()
+        repo_acessos = fabrica.criar_repositorio_registro_de_acesso()
+
+        return repo_usuarios, repo_unidades, repo_acessos
 
     @classmethod
     def resetar_instancia(cls) -> None:

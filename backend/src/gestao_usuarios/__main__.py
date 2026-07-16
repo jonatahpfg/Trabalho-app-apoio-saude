@@ -11,14 +11,8 @@ from __future__ import annotations
 import os
 import sys
 
-# Importar o novo repositório de banco de dados e as exceções
-from .adaptadores.adaptador_arquivo_de_log import AdaptadorArquivoDeLog
-from .adaptadores.arquivo_de_log_simples import ArquivoDeLogSimples
-from .adaptadores.repositorio_registro_de_acesso_em_memoria import (
-    RepositorioRegistroDeAcessoEmMemoria,
-)
-from .adaptadores.repositorio_usuario_em_memoria import RepositorioUsuarioEmMemoria
-from .adaptadores.repositorio_usuario_banco_de_dados import RepositorioUsuarioBancoDeDados
+# Importar o seletor da fábrica de repositórios e a porta de usuários
+from .adaptadores.seletor_fabrica import obter_fabrica_repositorio
 from .aplicacao.gerenciador_de_usuarios import GerenciadorDeUsuarios
 from .aplicacao.relatorio_de_acessos_csv import RelatorioDeAcessosCsv
 from .aplicacao.relatorio_de_acessos_texto import RelatorioDeAcessosTexto
@@ -36,17 +30,13 @@ def main() -> None:
     # Define 'memoria' como padrão. Se for definido como 'bd', usa SQLite.
     tipo_armazenamento = os.environ.get("STORAGE_TYPE", "memoria").lower()
 
-    if tipo_armazenamento == "bd": # Essa estrutura de if/else depois vou trocar para uma estrutura com polimorfismo,
-                                   # mas por enquanto é a forma mais simples de demonstrar o chaveamento de persistência. (Flavio)
-        print("-> Inicializando armazenamento em Banco de Dados (SQLite)...")
-        # Cria ou abre o arquivo local 'usuarios.db'
-        repositorio = RepositorioUsuarioBancoDeDados("usuarios.db")
-        # Adapter (Tarefa 5): o log de linhas de texto atende a porta de acessos
-        repositorio_acessos = AdaptadorArquivoDeLog(ArquivoDeLogSimples("acessos.log"))
-    else:
-        print("-> Inicializando armazenamento em Memória (RAM)...")
-        repositorio = RepositorioUsuarioEmMemoria()
-        repositorio_acessos = RepositorioRegistroDeAcessoEmMemoria()
+    fabrica = obter_fabrica_repositorio(tipo_armazenamento)
+
+    desc_tipo = "Banco de Dados (SQLite)" if tipo_armazenamento == "bd" else "Memória (RAM)"
+    print(f"-> Inicializando armazenamento em {desc_tipo} via Abstract Factory...")
+
+    repositorio = fabrica.criar_repositorio_usuario()
+    repositorio_acessos = fabrica.criar_repositorio_registro_de_acesso()
 
     gerenciador = GerenciadorDeUsuarios(repositorio, repositorio_acessos)
 
