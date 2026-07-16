@@ -1,23 +1,13 @@
-# Diagramas do Sistema — Gerenciamento de Usuários
+# Complemento de Documentação — Casos de Uso e Diagrama de Classe até Sprint 4
 
-**App Experimental de Triagem em Saúde**
+**Projeto:** App Experimental de Apoio à Triagem Médica  
+**Contexto documentado:** Gerenciamento de usuários, unidades básicas de saúde e estatísticas de acesso.
 
-Este documento concentra os diagramas do **contexto de Gerenciamento de Usuários**,
-incluindo cadastro e autenticação de usuários, cadastro de Unidades Básicas de Saúde,
-registro de acessos e geração de relatórios de estatísticas.
+Este documento complementa `docs/diagramas-sistema.md` com:
 
-Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 4**, contemplando:
-
-- autenticação por perfil;
-- CRUD de `Usuario`;
-- CRUD de `UnidadeBasicaSaude`;
-- registro de acessos dos usuários;
-- relatórios de estatísticas de acesso;
-- separação entre business e persistência por Repository;
-- padrões Factory Method, Abstract Factory, Adapter, Template Method, Facade e Singleton.
-
-> O **Paciente** e o módulo de triagem clínica aparecem no escopo geral do produto,
-> mas ainda não fazem parte deste contexto implementado no backend até a Sprint 4.
+1. descrição dos 3 casos de uso mais relevantes;
+2. diagrama de casos de uso contemplando os requisitos funcionais tratados até a Sprint 4;
+3. diagrama de classe de análise considerando CRUD de duas entidades, Repository, Adapter e Template Method.
 
 ---
 
@@ -28,9 +18,9 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 4**, co
 | Campo | Descrição |
 | ----- | --------- |
 | Atores principais | Administrador, Gestor da Unidade, Médico |
-| Objetivo | Permitir que o usuário acesse o sistema conforme seu perfil. |
+| Objetivo | Permitir que um usuário acesse o sistema de acordo com seu perfil. |
 | Pré-condições | O usuário deve estar cadastrado e ativo. |
-| Pós-condições | O acesso é autorizado ou recusado, e a tentativa é registrada para estatísticas. |
+| Pós-condições | O acesso é autorizado ou recusado; a tentativa de autenticação é registrada para estatísticas. |
 | Requisitos relacionados | RF03 — Autenticar por perfil; NF008 — Controle de acesso por perfil. |
 
 **Fluxo principal**
@@ -40,14 +30,14 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 4**, co
 3. O sistema consulta o usuário pelo e-mail.
 4. O sistema verifica a senha usando o hash armazenado.
 5. O sistema verifica se o usuário está ativo.
-6. O sistema registra a tentativa como `RegistroDeAcesso`.
-7. O sistema libera o acesso de acordo com o perfil do usuário.
+6. O sistema registra a tentativa de acesso como `RegistroDeAcesso`.
+7. O sistema libera o acesso conforme o perfil do usuário.
 
 **Fluxos alternativos**
 
-- E-mail inexistente ou senha incorreta: o sistema lança `CredenciaisInvalidas`.
-- Usuário inativo: o sistema lança `UsuarioInativo`.
-- Campos obrigatórios ausentes: o sistema lança `ErroDeValidacao`.
+- Se o e-mail não existir ou a senha estiver incorreta, o sistema lança erro de credenciais inválidas.
+- Se o usuário estiver inativo, o sistema recusa o acesso.
+- Se e-mail ou senha estiverem vazios, o sistema retorna erro de validação.
 
 ---
 
@@ -58,14 +48,14 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 4**, co
 | Atores principais | Administrador, Gestor da Unidade |
 | Objetivo | Cadastrar e consultar usuários que operam o sistema. |
 | Pré-condições | O ator deve estar autenticado e possuir perfil autorizado. |
-| Pós-condições | O usuário é cadastrado ou listado conforme as regras de domínio. |
+| Pós-condições | O usuário é cadastrado, listado ou validado conforme as regras de domínio. |
 | Requisitos relacionados | RF02 — Gerenciar gestores e médicos; NF008 — Controle de acesso por perfil. |
 
 **Fluxo principal**
 
 1. O ator solicita o cadastro de um novo usuário.
 2. O sistema recebe nome, CPF, e-mail, telefone, senha e perfil.
-3. O sistema valida os dados obrigatórios e a política de senha.
+3. O sistema valida os dados obrigatórios e a força da senha.
 4. O sistema verifica se já existe usuário com o mesmo CPF.
 5. O sistema cria a entidade `Usuario`.
 6. O sistema persiste o usuário por meio da porta `RepositorioUsuario`.
@@ -73,13 +63,13 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 4**, co
 
 **Fluxos alternativos**
 
-- CPF já cadastrado: o sistema lança `CpfDuplicado`.
-- Dados inválidos: o sistema lança `ErroDeValidacao`.
-- Falha de persistência: o sistema lança uma exceção específica de persistência.
+- Se o CPF já estiver cadastrado, o sistema lança `CpfDuplicado`.
+- Se os dados forem inválidos, o sistema lança `ErroDeValidacao`.
+- Se houver falha de persistência, o erro é tratado na camada de infraestrutura.
 
 ---
 
-### UC03 — Gerenciar Unidades Básicas de Saúde
+### UC03 — Gerenciar unidades básicas de saúde
 
 | Campo | Descrição |
 | ----- | --------- |
@@ -94,24 +84,22 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 4**, co
 1. O ator solicita o cadastro de uma Unidade Básica de Saúde.
 2. O sistema recebe nome, CNPJ, endereço e telefone.
 3. O sistema valida os campos obrigatórios e o formato do CNPJ.
-4. O sistema verifica se já existe unidade com o mesmo CNPJ.
+4. O sistema verifica se já existe uma unidade com o mesmo CNPJ.
 5. O sistema cria a entidade `UnidadeBasicaSaude`.
 6. O sistema persiste a unidade por meio da porta `RepositorioUnidadeBasicaSaude`.
 7. O sistema permite listar, buscar, atualizar e remover logicamente a unidade.
 
 **Fluxos alternativos**
 
-- CNPJ já cadastrado: o sistema lança `CnpjDuplicado`.
-- Unidade inexistente: o sistema lança `UnidadeNaoEncontrada`.
-- Remoção: a unidade não é apagada fisicamente; ela é marcada como inativa.
+- Se o CNPJ já estiver cadastrado, o sistema lança `CnpjDuplicado`.
+- Se a unidade não existir, o sistema lança `UnidadeNaoEncontrada`.
+- Na remoção, a unidade não é apagada fisicamente; ela é marcada como inativa.
 
 ---
 
-## 2. Diagrama de Casos de Uso
+## 2. Diagrama de casos de uso
 
-O diagrama abaixo representa os casos de uso contemplados no contexto de gerenciamento
-até a Sprint 4: autenticação, gerenciamento de usuários, gerenciamento de UBS,
-registro de acessos e geração de relatórios.
+O diagrama abaixo contempla os principais requisitos funcionais tratados até a Sprint 4: autenticação por perfil, gerenciamento de usuários, gerenciamento de unidades, registro de acessos e geração de relatórios de estatísticas.
 
 ```mermaid
 flowchart LR
@@ -119,21 +107,20 @@ flowchart LR
     Gestor([Gestor da Unidade])
     Medico([Médico])
 
-    subgraph Sistema[Gerenciamento de Usuários e Unidades]
+    subgraph Sistema[App de Apoio à Triagem Médica]
         UC_AUTH(("Autenticar por Perfil"))
-
         UC_GER_USU["Gerenciar Usuários"]
         UC_ADD_USU["Cadastrar Usuário"]
         UC_LIST_USU["Listar Usuários"]
+        UC_TOGGLE_USU["Ativar / Desativar Usuário"]
+        UC_SELF["Consultar Próprio Cadastro"]
 
-        UC_GER_UBS["Gerenciar UBS"]
+        UC_GER_UBS["Gerenciar Unidades Básicas de Saúde"]
         UC_ADD_UBS["Cadastrar UBS"]
         UC_LIST_UBS["Listar UBS"]
-        UC_SEARCH_UBS["Buscar UBS"]
         UC_UPDATE_UBS["Atualizar UBS"]
         UC_REMOVE_UBS["Remover UBS"]
 
-        UC_SELF["Consultar Próprio Cadastro"]
         UC_REG_ACESSO["Registrar Acesso"]
         UC_RELATORIO["Gerar Relatório de Estatísticas de Acesso"]
     end
@@ -143,6 +130,7 @@ flowchart LR
     Medico --> UC_AUTH
 
     Admin --> UC_GER_USU
+    Admin --> UC_TOGGLE_USU
     Admin --> UC_GER_UBS
     Admin --> UC_RELATORIO
 
@@ -162,7 +150,6 @@ flowchart LR
 
     UC_GER_UBS --> UC_ADD_UBS
     UC_GER_UBS --> UC_LIST_UBS
-    UC_GER_UBS --> UC_SEARCH_UBS
     UC_GER_UBS --> UC_UPDATE_UBS
     UC_GER_UBS --> UC_REMOVE_UBS
 
@@ -170,25 +157,19 @@ flowchart LR
     UC_RELATORIO -.->|"consulta"| UC_REG_ACESSO
 ```
 
-> **Observação:** o diagrama considera o contexto implementado até a Sprint 4.
-> Funcionalidades futuras do produto, como triagem clínica, pacientes e IA, devem ser
-> modeladas em diagramas próprios quando forem incorporadas ao backend.
-
 ---
 
-## 3. Diagrama de Classe de Análise até a Sprint 4
+## 3. Diagrama de classe de análise até a Sprint 4
 
-Este diagrama substitui a visão antiga do Laboratório 2 e representa o estado atual
-do projeto até a Sprint 4. Ele contempla:
+Este diagrama considera a evolução do projeto até a Sprint 4:
 
 - CRUD de `Usuario`;
 - CRUD de `UnidadeBasicaSaude`;
-- entidade `RegistroDeAcesso`;
-- padrão **Repository** para separar business e persistência;
-- **Factory Method** e **Abstract Factory** para seleção/criação de repositórios;
-- **Adapter** para adaptar o arquivo de log à porta de registro de acessos;
-- **Template Method** para relatórios de estatísticas de acesso;
-- **Facade** e **Singleton** no controller/fachada principal.
+- padrão **Repository** para separar negócio e persistência;
+- padrão **Factory Method / Abstract Factory** para seleção de repositórios;
+- padrão **Adapter** para adaptar arquivo de log à porta de registros de acesso;
+- padrão **Template Method** para geração de relatórios;
+- padrões **Facade** e **Singleton** na fachada principal.
 
 ```mermaid
 classDiagram
@@ -419,74 +400,20 @@ classDiagram
 
 ---
 
-## 4. Sprint 3 — Padrões Facade + Singleton e CRUD de Unidade Básica de Saúde
+## 4. Rastreabilidade complementar
 
-A Sprint 3 introduziu o cadastro completo da entidade `UnidadeBasicaSaude`,
-incluindo criação, listagem, busca por id, atualização e remoção lógica.
-
-Também foi criada a `FacadeSingletonController`, que funciona como:
-
-- **Facade:** centraliza o acesso aos gerenciadores de usuários e unidades;
-- **Singleton:** disponibiliza uma única instância principal da fachada;
-- **ponto de contagem:** expõe `obter_quantidade_total_entidades_cadastradas()`.
-
-O arquivo PlantUML específico da Sprint 3 está disponível em:
-
-[`diagrama-classes-v2.puml`](diagrama-classes-v2.puml)
-
----
-
-## 5. Sprint 4 — Diagrama Final de Padrões de Projeto
-
-A Sprint 4 consolida a separação entre a camada de negócio (`aplicacao` e `dominio`)
-e a camada de persistência/infraestrutura (`portas` e `adaptadores`).
-
-O arquivo PlantUML do diagrama final está disponível em:
-
-[`diagrama-classes-final-sprint4.puml`](diagrama-classes-final-sprint4.puml)
-
-| Padrão | Onde aparece no projeto |
-| ------ | ------------------------ |
+| Item solicitado | Onde está representado |
+| --------------- | ---------------------- |
+| Descrição dos 3 casos de uso mais relevantes | Seção 1 deste documento |
+| Diagrama de casos de uso com requisitos funcionais | Seção 2 deste documento |
+| CRUD de `Usuario` | `GerenciadorDeUsuarios`, `Usuario`, `RepositorioUsuario` |
+| CRUD de `UnidadeBasicaSaude` | `GerenciadorDeUnidades`, `UnidadeBasicaSaude`, `RepositorioUnidadeBasicaSaude` |
 | Repository | `RepositorioUsuario`, `RepositorioUnidadeBasicaSaude`, `RepositorioRegistroDeAcesso` |
-| Factory Method | `obter_fabrica_repositorio()` em `seletor_fabrica.py` |
-| Abstract Factory | `FabricaRepositorio`, `FabricaRepositorioEmMemoria`, `FabricaRepositorioBancoDeDados` |
-| Adapter | `AdaptadorArquivoDeLog`, adaptando `ArquivoDeLogSimples` para `RepositorioRegistroDeAcesso` |
-| Template Method | `RelatorioDeAcessos.gerar()` com `RelatorioDeAcessosTexto` e `RelatorioDeAcessosCsv` |
+| Factory Method | `SeletorFabrica.obter_fabrica_repositorio()` |
+| Abstract Factory | `FabricaRepositorio` e fábricas concretas |
+| Adapter | `AdaptadorArquivoDeLog` e `ArquivoDeLogSimples` |
+| Template Method | `RelatorioDeAcessos.gerar()` e subclasses |
 | Facade | `FacadeSingletonController` |
 | Singleton | `FacadeSingletonController.instancia()` |
 
----
-
-## 6. Rastreabilidade
-
-| Caso de uso / item técnico | Requisito / Laboratório | Entrega |
-| -------------------------- | ------------------------ | ------- |
-| Autenticar por Perfil | RF03 / NF008 | Sprint 2 / Sprint 4 |
-| Adicionar Usuário | RF02 | Sprint 1 / Sprint 2 |
-| Listar Usuários | RF02 | Sprint 1 |
-| Validar Login | Sprint 2 | Sprint 2 |
-| Validar Senha com hash | Sprint 2 / NF007 | Sprint 2 / Sprint 4 |
-| Tratar Erros de Validação | Sprint 2 | Sprint 2 |
-| Persistência em Memória RAM | ADR-002 / Repository | Sprint 1 / Sprint 2 / Sprint 4 |
-| Persistência em SQLite | Repository / Banco de Dados | Sprint 4 |
-| Registro de Acessos | Estatísticas de autenticação | Sprint 4 |
-| Adapter de Log de Acessos | Sprint 4 (Adapter) | Sprint 4 |
-| Relatórios de Estatísticas | Sprint 4 (Template Method) | Sprint 4 |
-| CRUD Unidade Básica de Saúde | Sprint 3 (nova entidade) | Sprint 3 |
-| Facade + Singleton Controller | Sprint 3 (Padrões GoF) | Sprint 3 |
-| Contagem total de entidades | Sprint 3 (método Facade) | Sprint 3 |
-| Repository para entidades | Sprint 4 (Repository) | Sprint 4 |
-| Factory Method / Abstract Factory | Sprint 4 (Factory) | Sprint 4 |
-| Diagrama de casos de uso atualizado | Casos de uso até Sprint 4 | Sprint 4 |
-| Diagrama de classe de análise atualizado | Classe de análise até Sprint 4 | Sprint 4 |
-| Diagrama final de padrões | Sprint 4 (diagrama final) | Sprint 4 |
----
-
-## 7. Complemento — Casos de uso e diagrama de análise até Sprint 4
-
-A documentação complementar com a descrição dos três casos de uso mais relevantes,
-o diagrama de casos de uso atualizado e o diagrama de classe de análise até a
-Sprint 4 está disponível em:
-
-[Complemento de Documentação — Sprint 4](complemento-sprint4-casos-uso-e-analise.md)
 
