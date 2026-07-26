@@ -10,32 +10,49 @@ def test_cria_registro_quando_dados_validos():
     momento = datetime(2026, 7, 15, 10, 30)
 
     registro = RegistroDeAcesso.criar(
-        email="ana@ubs.gov.br", sucesso=True, data_hora=momento
+        login="ana",
+        sucesso=True,
+        data_hora=momento,
     )
 
-    assert registro.email == "ana@ubs.gov.br"
+    assert registro.login == "ana"
     assert registro.sucesso is True
     assert registro.data_hora == momento
     assert registro.id is None
 
 
 def test_preenche_data_hora_quando_nao_informada():
-    registro = RegistroDeAcesso.criar(email="ana@ubs.gov.br", sucesso=False)
+    registro = RegistroDeAcesso.criar(
+        login="ana",
+        sucesso=False,
+    )
 
-    assert isinstance(registro.data_hora, datetime)
+    assert isinstance(
+        registro.data_hora,
+        datetime,
+    )
 
 
-def test_normaliza_email_removendo_espacos():
-    registro = RegistroDeAcesso.criar(email="  ana@ubs.gov.br  ", sucesso=True)
+def test_normaliza_login_removendo_espacos():
+    registro = RegistroDeAcesso.criar(
+        login="  ana  ",
+        sucesso=True,
+    )
 
-    assert registro.email == "ana@ubs.gov.br"
+    assert registro.login == "ana"
 
 
-def test_rejeita_registro_quando_email_vazio():
+def test_rejeita_registro_quando_login_vazio():
     with pytest.raises(ErroDeValidacao):
-        RegistroDeAcesso.criar(email="   ", sucesso=True)
+        RegistroDeAcesso.criar(
+            login="   ",
+            sucesso=True,
+        )
 
 
 def test_rejeita_registro_quando_sucesso_nao_e_booleano():
     with pytest.raises(ErroDeValidacao):
-        RegistroDeAcesso.criar(email="ana@ubs.gov.br", sucesso="sim")
+        RegistroDeAcesso.criar(
+            login="ana",
+            sucesso="sim",
+        )

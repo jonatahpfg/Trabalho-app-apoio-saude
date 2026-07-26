@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .relatorio_de_acessos import (
-    EstatisticaPorEmail,
+    EstatisticaPorLogin,
     EstatisticasDeAcesso,
     RelatorioDeAcessos,
 )
@@ -13,12 +13,15 @@ class RelatorioDeAcessosCsv(RelatorioDeAcessos):
     """Formata as estatísticas de acesso como CSV para uso por outras ferramentas."""
 
     def _cabecalho(self) -> str:
-        return "email,tentativas,sucessos,falhas,ultimo_acesso"
+        return "login,tentativas,sucessos,falhas,ultimo_acesso"
 
-    def _linha_por_email(self, estatistica: EstatisticaPorEmail) -> str:
+    def _linha_por_login(
+        self,
+        estatistica: EstatisticaPorLogin,
+    ) -> str:
         return ",".join(
             [
-                f'"{estatistica.email}"',
+                f'"{estatistica.login}"',
                 str(estatistica.tentativas),
                 str(estatistica.sucessos),
                 str(estatistica.falhas),
@@ -26,7 +29,10 @@ class RelatorioDeAcessosCsv(RelatorioDeAcessos):
             ]
         )
 
-    def _rodape(self, estatisticas: EstatisticasDeAcesso) -> str:
+    def _rodape(
+        self,
+        estatisticas: EstatisticasDeAcesso,
+    ) -> str:
         return (
             f'"TOTAL",{estatisticas.total},{estatisticas.sucessos},'
             f"{estatisticas.falhas},{estatisticas.taxa_de_sucesso:.1f}%"

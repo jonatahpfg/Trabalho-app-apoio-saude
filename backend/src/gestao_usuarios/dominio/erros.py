@@ -30,6 +30,10 @@ class CpfDuplicado(ErroDeDominio):
     """Já existe um usuário cadastrado com o mesmo CPF."""
 
 
+class LoginDuplicado(ErroDeDominio):
+    """Já existe um usuário cadastrado com o mesmo login."""
+
+
 # ---------------------------------------------------------------------------
 # Exceções de autenticação — subárvore ErroDeAutenticacao
 #
@@ -49,9 +53,9 @@ class ErroDeAutenticacao(ErroDeDominio):
 
 
 class CredenciaisInvalidas(ErroDeAutenticacao):
-    """E-mail ou senha incorretos.
+    """Login ou senha incorretos.
 
-    Intencionalmente genérica entre "e-mail não encontrado" e "senha errada"
+    Intencionalmente genérica entre "login não encontrado" e "senha errada"
     para não vazar ao atacante qual parte está errada (segurança por
     obscuridade mínima). O nome revela o que deu errado sem revelar o porquê
     técnico (Taborda: o quê, o onde, o porquê — mas apenas o necessário).
@@ -66,6 +70,7 @@ class UsuarioInativo(ErroDeAutenticacao):
     senha (Taborda: seja específico o suficiente para guiar o tratamento).
     """
 
+
 class ErroDePersistencia(ErroDeDominio):
     """Falha ao salvar ou recuperar dados do banco.
 
@@ -76,6 +81,7 @@ class ErroDePersistencia(ErroDeDominio):
     técnicos desnecessários).
     """
 
+
 class ErroDeAcessoAoArquivo(ErroDePersistencia):
     """Falha ao acessar o arquivo de dados.
 
@@ -85,6 +91,7 @@ class ErroDeAcessoAoArquivo(ErroDePersistencia):
     o nome da exceção deve revelar o problema, mas não detalhes técnicos
     desnecessários).
     """
+
 
 class ErroDeAcessoAoBanco(ErroDePersistencia):
     """Falha ao acessar o banco de dados.
@@ -106,4 +113,4 @@ class CnpjDuplicado(ErroDeDominio):
 
 
 class UnidadeNaoEncontrada(ErroDeDominio):
-    """Unidade Básica de Saúde não encontrada com o identificador informado."""
+    """Unidade Básica de Saúde não encontrada com o identificador informado."""

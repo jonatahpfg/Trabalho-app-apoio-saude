@@ -10,15 +10,16 @@ from .erros import ErroDeValidacao
 
 @dataclass
 class RegistroDeAcesso:
-    """Evento de login registrado a cada tentativa de autenticação.
+    """Evento registrado a cada tentativa de autenticação.
 
-    Guarda o e-mail informado (e não uma referência ao usuário) porque
-    tentativas com e-mail inexistente também precisam aparecer nas
-    estatísticas de acesso. Use ``RegistroDeAcesso.criar`` para garantir
-    as invariantes.
+    Guarda o login informado, e não uma referência ao usuário, porque
+    tentativas realizadas com logins inexistentes também precisam aparecer
+    nas estatísticas de acesso.
+
+    Use ``RegistroDeAcesso.criar`` para garantir as invariantes.
     """
 
-    email: str
+    login: str
     sucesso: bool
     data_hora: datetime
     id: int | None = None
@@ -27,21 +28,27 @@ class RegistroDeAcesso:
     def criar(
         cls,
         *,
-        email: str,
+        login: str,
         sucesso: bool,
         data_hora: datetime | None = None,
     ) -> RegistroDeAcesso:
         """Cria um registro válido ou lança ``ErroDeValidacao``.
 
-        Quando ``data_hora`` não é informada, usa o momento atual.
+        Quando ``data_hora`` não é informada, utiliza o momento atual.
         """
-        if email is None or not str(email).strip():
-            raise ErroDeValidacao("Campo obrigatório ausente: email")
+
+        if login is None or not str(login).strip():
+            raise ErroDeValidacao(
+                "Campo obrigatório ausente: login"
+            )
+
         if not isinstance(sucesso, bool):
-            raise ErroDeValidacao(f"Valor inválido para sucesso: {sucesso!r}")
+            raise ErroDeValidacao(
+                f"Valor inválido para sucesso: {sucesso!r}"
+            )
 
         return cls(
-            email=str(email).strip(),
+            login=str(login).strip(),
             sucesso=sucesso,
             data_hora=data_hora or datetime.now(),
         )

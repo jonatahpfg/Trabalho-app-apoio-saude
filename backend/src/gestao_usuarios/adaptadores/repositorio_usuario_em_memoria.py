@@ -35,3 +35,9 @@ class RepositorioUsuarioEmMemoria:
             if usuario.email == email:
                 return replace(usuario)
         return None
+
+    def buscar_por_login(self, login: str) -> Usuario | None:
+        for usuario in self._usuarios.values():
+            if usuario.login == login:
+                return replace(usuario)
+        return None
