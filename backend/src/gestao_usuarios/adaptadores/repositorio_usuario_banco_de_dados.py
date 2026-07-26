@@ -21,7 +21,9 @@ class RepositorioUsuarioBancoDeDados:
             self._conexao.row_factory = sqlite3.Row
             self._criar_tabela()
         except sqlite3.Error as e:
-            raise ErroDeAcessoAoBanco("Falha ao inicializar o banco de dados.", e) from e
+            raise ErroDeAcessoAoBanco(
+                "Falha ao inicializar o banco de dados.", e
+            ) from e
 
     def _obter_conexao(self) -> sqlite3.Connection:
         return self._conexao
@@ -36,6 +38,7 @@ class RepositorioUsuarioBancoDeDados:
                     cpf TEXT NOT NULL UNIQUE,
                     email TEXT NOT NULL UNIQUE,
                     telefone TEXT NOT NULL,
+                    login TEXT NOT NULL UNIQUE,
                     senha_hash TEXT NOT NULL,
                     perfil TEXT NOT NULL,
                     ativo INTEGER NOT NULL DEFAULT 1
@@ -51,14 +54,24 @@ class RepositorioUsuarioBancoDeDados:
                     # Inserir novo usuário
                     cursor = conn.execute(
                         """
-                        INSERT INTO usuarios (nome, cpf, email, telefone, senha_hash, perfil, ativo)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO usuarios (
+                            nome,
+                            cpf,
+                            email,
+                            telefone,
+                            login,
+                            senha_hash,
+                            perfil,
+                            ativo
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             usuario.nome,
                             usuario.cpf,
                             usuario.email,
                             usuario.telefone,
+                            usuario.login,
                             usuario.senha_hash,
                             usuario.perfil.value,
                             1 if usuario.ativo else 0,
@@ -66,37 +79,57 @@ class RepositorioUsuarioBancoDeDados:
                     )
                     novo_id = cursor.lastrowid
                     return replace(usuario, id=novo_id)
-                else:
-                    # Atualizar usuário existente
-                    conn.execute(
-                        """
-                        UPDATE usuarios
-                        SET nome = ?, cpf = ?, email = ?, telefone = ?, senha_hash = ?, perfil = ?, ativo = ?
-                        WHERE id = ?
-                        """,
-                        (
-                            usuario.nome,
-                            usuario.cpf,
-                            usuario.email,
-                            usuario.telefone,
-                            usuario.senha_hash,
-                            usuario.perfil.value,
-                            1 if usuario.ativo else 0,
-                            usuario.id,
-                        ),
-                    )
-                    return replace(usuario)
+
+                # Atualizar usuário existente
+                conn.execute(
+                    """
+                    UPDATE usuarios
+                    SET
+                        nome = ?,
+                        cpf = ?,
+                        email = ?,
+                        telefone = ?,
+                        login = ?,
+                        senha_hash = ?,
+                        perfil = ?,
+                        ativo = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        usuario.nome,
+                        usuario.cpf,
+                        usuario.email,
+                        usuario.telefone,
+                        usuario.login,
+                        usuario.senha_hash,
+                        usuario.perfil.value,
+                        1 if usuario.ativo else 0,
+                        usuario.id,
+                    ),
+                )
+                return replace(usuario)
+
         except sqlite3.Error as e:
-            raise ErroDeAcessoAoBanco(f"Erro ao salvar usuário com CPF {usuario.cpf}.", e) from e
+            raise ErroDeAcessoAoBanco(
+                f"Erro ao salvar usuário com CPF {usuario.cpf}.", e
+            ) from e
 
     def buscar_todos(self) -> list[Usuario]:
         """Devolve todos os usuários cadastrados."""
         try:
             with self._obter_conexao() as conn:
-                linhas = conn.execute("SELECT * FROM usuarios").fetchall()
-                return [_linha_para_usuario(linha) for linha in linhas]
+                linhas = conn.execute(
+                    "SELECT * FROM usuarios"
+                ).fetchall()
+
+                return [
+                    _linha_para_usuario(linha)
+                    for linha in linhas
+                ]
         except sqlite3.Error as e:
-            raise ErroDeAcessoAoBanco("Erro ao listar usuários.", e) from e
+            raise ErroDeAcessoAoBanco(
+                "Erro ao listar usuários.", e
+            ) from e
 
     def buscar_por_cpf(self, cpf: str) -> Usuario | None:
         """Devolve o usuário com o CPF informado, ou ``None`` se não existir."""
@@ -106,15 +139,32 @@ class RepositorioUsuarioBancoDeDados:
         """Devolve o usuário com o e-mail informado, ou ``None`` se não existir."""
         return self._buscar_por_campo("email", email)
 
-    def _buscar_por_campo(self, campo: str, valor: str) -> Usuario | None:
+    def buscar_por_login(self, login: str) -> Usuario | None:
+        """Devolve o usuário com o login informado, ou ``None`` se não existir."""
+        return self._buscar_por_campo("login", login)
+
+    def _buscar_por_campo(
+        self,
+        campo: str,
+        valor: str,
+    ) -> Usuario | None:
         try:
             with self._obter_conexao() as conn:
                 linha = conn.execute(
-                    f"SELECT * FROM usuarios WHERE {campo} = ?", (valor,)
+                    f"SELECT * FROM usuarios WHERE {campo} = ?",
+                    (valor,),
                 ).fetchone()
-                return _linha_para_usuario(linha) if linha is not None else None
+
+                return (
+                    _linha_para_usuario(linha)
+                    if linha is not None
+                    else None
+                )
+
         except sqlite3.Error as e:
-            raise ErroDeAcessoAoBanco(f"Erro ao buscar usuário por {campo}.", e) from e
+            raise ErroDeAcessoAoBanco(
+                f"Erro ao buscar usuário por {campo}.", e
+            ) from e
 
 
 def _linha_para_usuario(linha: sqlite3.Row) -> Usuario:
@@ -125,6 +175,7 @@ def _linha_para_usuario(linha: sqlite3.Row) -> Usuario:
         cpf=linha["cpf"],
         email=linha["email"],
         telefone=linha["telefone"],
+        login=linha["login"],
         senha_hash=linha["senha_hash"],
         perfil=Perfil(linha["perfil"]),
         ativo=bool(linha["ativo"]),

@@ -45,21 +45,35 @@ class FacadeSingletonController:
         repositorio_unidades: RepositorioUnidadeBasicaSaude,
         repositorio_acessos: RepositorioRegistroDeAcesso | None = None,
     ) -> None:
-        self._gerenciador_usuarios = GerenciadorDeUsuarios(repositorio_usuarios, repositorio_acessos)
-        self._gerenciador_unidades = GerenciadorDeUnidades(repositorio_unidades)
+        self._gerenciador_usuarios = GerenciadorDeUsuarios(
+            repositorio_usuarios,
+            repositorio_acessos,
+        )
+        self._gerenciador_unidades = GerenciadorDeUnidades(
+            repositorio_unidades
+        )
 
     @classmethod
     def instancia(cls) -> FacadeSingletonController:
         """Ponto de acesso global à instância única (lazy initialization)."""
         if cls._instancia_unica is None:
             repo_usuarios, repo_unidades, repo_acessos = cls._criar_repositorios()
-            cls._instancia_unica = cls(repo_usuarios, repo_unidades, repo_acessos)
+            cls._instancia_unica = cls(
+                repo_usuarios,
+                repo_unidades,
+                repo_acessos,
+            )
+
         return cls._instancia_unica
 
     @classmethod
     def _criar_repositorios(
         cls,
-    ) -> tuple[RepositorioUsuario, RepositorioUnidadeBasicaSaude, RepositorioRegistroDeAcesso]:
+    ) -> tuple[
+        RepositorioUsuario,
+        RepositorioUnidadeBasicaSaude,
+        RepositorioRegistroDeAcesso,
+    ]:
         """Escolhe os repositórios utilizando a fábrica abstrata de persistência."""
         tipo = os.environ.get("STORAGE_TYPE", "memoria").lower()
         fabrica = obter_fabrica_repositorio(tipo)
@@ -86,6 +100,7 @@ class FacadeSingletonController:
         cpf: str,
         email: str,
         telefone: str,
+        login: str,
         senha: str,
         perfil: Perfil | str,
     ) -> Usuario:
@@ -94,6 +109,7 @@ class FacadeSingletonController:
             cpf=cpf,
             email=email,
             telefone=telefone,
+            login=login,
             senha=senha,
             perfil=perfil,
         )
@@ -101,8 +117,11 @@ class FacadeSingletonController:
     def listar_usuarios(self) -> list[Usuario]:
         return self._gerenciador_usuarios.listar_usuarios()
 
-    def autenticar(self, *, email: str, senha: str) -> Usuario:
-        return self._gerenciador_usuarios.autenticar(email=email, senha=senha)
+    def autenticar(self, *, login: str, senha: str) -> Usuario:
+        return self._gerenciador_usuarios.autenticar(
+            login=login,
+            senha=senha,
+        )
 
     # ---- Unidades Básicas de Saúde ----
 
@@ -122,14 +141,21 @@ class FacadeSingletonController:
         )
 
     def listar_unidades(
-        self, *, apenas_ativas: bool = False
+        self,
+        *,
+        apenas_ativas: bool = False,
     ) -> list[UnidadeBasicaSaude]:
         return self._gerenciador_unidades.listar_unidades(
             apenas_ativas=apenas_ativas
         )
 
-    def buscar_unidade_por_id(self, unidade_id: int) -> UnidadeBasicaSaude:
-        return self._gerenciador_unidades.buscar_unidade_por_id(unidade_id)
+    def buscar_unidade_por_id(
+        self,
+        unidade_id: int,
+    ) -> UnidadeBasicaSaude:
+        return self._gerenciador_unidades.buscar_unidade_por_id(
+            unidade_id
+        )
 
     def atualizar_unidade(
         self,
@@ -148,8 +174,13 @@ class FacadeSingletonController:
             telefone=telefone,
         )
 
-    def remover_unidade(self, unidade_id: int) -> UnidadeBasicaSaude:
-        return self._gerenciador_unidades.remover_unidade(unidade_id)
+    def remover_unidade(
+        self,
+        unidade_id: int,
+    ) -> UnidadeBasicaSaude:
+        return self._gerenciador_unidades.remover_unidade(
+            unidade_id
+        )
 
     # ---- Método exigido pela Sprint 3 ----
 
@@ -158,6 +189,11 @@ class FacadeSingletonController:
 
         Soma o total de usuários e de unidades básicas de saúde persistidos.
         """
-        total_usuarios = len(self._gerenciador_usuarios.listar_usuarios())
-        total_unidades = len(self._gerenciador_unidades.listar_unidades())
+        total_usuarios = len(
+            self._gerenciador_usuarios.listar_usuarios()
+        )
+        total_unidades = len(
+            self._gerenciador_unidades.listar_unidades()
+        )
+
         return total_usuarios + total_unidades

@@ -25,3 +25,7 @@ class RepositorioUsuario(Protocol):
     def buscar_por_email(self, email: str) -> Usuario | None:
         """Devolve o usuário com o e-mail informado, ou ``None`` se não existir."""
         ...
+
+    def buscar_por_login(self, login: str) -> Usuario | None:
+        """Devolve o usuário com o login informado, ou ``None`` se não existir."""
+        ...
