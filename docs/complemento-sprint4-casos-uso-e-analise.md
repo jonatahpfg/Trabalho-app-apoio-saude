@@ -1,4 +1,4 @@
-# Complemento de Documentação — Casos de Uso e Diagrama de Classe até Sprint 4
+# Complemento de Documentação — Casos de Uso e Diagrama de Classe até Sprint 4 (Desatualizado, conferir docs/diagramas-sistema.md)
 
 **Projeto:** App Experimental de Apoio à Triagem Médica  
 **Contexto documentado:** Gerenciamento de usuários, unidades básicas de saúde e estatísticas de acesso.

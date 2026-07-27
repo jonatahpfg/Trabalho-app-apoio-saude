@@ -1,15 +1,22 @@
 @startuml
-title Diagrama Final de Classes — Sprint 4: Padrões GoF e Repository
+title Diagrama Final de Classes — Sprint 4 (revisado após avaliação)
 
 skinparam classAttributeIconSize 0
 
+
+' ============================================================
+' DOMÍNIO
+' ============================================================
+
 package "dominio" {
+
     class Usuario <<Entity>> {
         - id: int | None
         - nome: str
         - cpf: str
         - email: str
         - telefone: str
+        - login: str
         - senha_hash: str
         - perfil: Perfil
         - ativo: bool
@@ -34,32 +41,121 @@ package "dominio" {
 
     class RegistroDeAcesso <<Entity>> {
         - id: int | None
-        - email: str
+        - login: str
         - sucesso: bool
         - data_hora: datetime
         + criar(...): RegistroDeAcesso
     }
 
-    Usuario --> Perfil
+    class Senha <<Utility>> {
+        + {static} gerar_hash(senha: str): str
+        + {static} verificar(senha: str, senha_hash: str): bool
+    }
+
+    Usuario --> Perfil : possui
+    Usuario ..> Senha : gera hash
 }
 
+
+' ============================================================
+' VALIDAÇÕES DO DOMÍNIO
+' ============================================================
+
+package "dominio.validacoes" {
+
+    class ValidadorTextoObrigatorio <<Validator>> {
+        + {static} validar(valor: str, campo: str): str
+    }
+
+    class ValidadorLogin <<Validator>> {
+        + {static} validar(login: str): str
+    }
+
+    class ValidadorEmail <<Validator>> {
+        + {static} validar(email: str): str
+    }
+
+    class ValidadorSenha <<Validator>> {
+        + {static} validar(senha: str, nome: str, email: str): str
+    }
+
+    class ValidadorPerfil <<Validator>> {
+        + {static} validar(perfil, tipo_perfil)
+    }
+
+    ValidadorLogin ..> ValidadorTextoObrigatorio
+    ValidadorEmail ..> ValidadorTextoObrigatorio
+    ValidadorSenha ..> ValidadorTextoObrigatorio
+}
+
+Usuario ..> ValidadorTextoObrigatorio : valida campos
+Usuario ..> ValidadorLogin : valida login
+Usuario ..> ValidadorEmail : valida e-mail
+Usuario ..> ValidadorSenha : valida senha
+Usuario ..> ValidadorPerfil : valida perfil
+
+
+' ============================================================
+' EXCEÇÕES
+' ============================================================
+
+package "dominio.erros" {
+
+    class ErroDeDominio <<Exception>>
+    class ErroDeValidacao <<Exception>>
+
+    class CpfDuplicado <<Exception>>
+    class LoginDuplicado <<Exception>>
+    class CnpjDuplicado <<Exception>>
+
+    class UsuarioInativo <<Exception>>
+    class CredenciaisInvalidas <<Exception>>
+    class UnidadeNaoEncontrada <<Exception>>
+
+    class ErroDePersistencia <<Exception>>
+    class ErroDeAcessoAoBanco <<Exception>>
+    class ErroDeAcessoAoArquivo <<Exception>>
+
+    ErroDeDominio <|-- ErroDeValidacao
+
+    ErroDeDominio <|-- CpfDuplicado
+    ErroDeDominio <|-- LoginDuplicado
+    ErroDeDominio <|-- CnpjDuplicado
+
+    ErroDeDominio <|-- UsuarioInativo
+    ErroDeDominio <|-- CredenciaisInvalidas
+    ErroDeDominio <|-- UnidadeNaoEncontrada
+
+    ErroDeDominio <|-- ErroDePersistencia
+
+    ErroDePersistencia <|-- ErroDeAcessoAoBanco
+    ErroDePersistencia <|-- ErroDeAcessoAoArquivo
+}
+
+
+' ============================================================
+' PORTAS
+' ============================================================
+
 package "portas" {
+
     interface RepositorioUsuario <<Repository>> {
-        + salvar(usuario): Usuario
+        + salvar(usuario: Usuario): Usuario
         + buscar_todos(): list<Usuario>
-        + buscar_por_cpf(cpf): Usuario | None
-        + buscar_por_email(email): Usuario | None
+        + buscar_por_cpf(cpf: str): Usuario | None
+        + buscar_por_email(email: str): Usuario | None
+        + buscar_por_login(login: str): Usuario | None
     }
 
     interface RepositorioUnidadeBasicaSaude <<Repository>> {
-        + salvar(unidade): UnidadeBasicaSaude
+        + salvar(unidade: UnidadeBasicaSaude): UnidadeBasicaSaude
         + buscar_todas(): list<UnidadeBasicaSaude>
-        + buscar_por_id(id): UnidadeBasicaSaude | None
-        + buscar_por_cnpj(cnpj): UnidadeBasicaSaude | None
+        + buscar_por_id(id: int): UnidadeBasicaSaude | None
+        + buscar_por_cnpj(cnpj: str): UnidadeBasicaSaude | None
     }
 
     interface RepositorioRegistroDeAcesso <<Repository>> {
-        + salvar(registro): RegistroDeAcesso
+        + salvar(registro: RegistroDeAcesso): RegistroDeAcesso
         + buscar_todos(): list<RegistroDeAcesso>
     }
 
@@ -70,38 +166,48 @@ package "portas" {
     }
 }
 
-package "aplicacao / business" {
+
+' ============================================================
+' APLICAÇÃO / BUSINESS
+' ============================================================
+
+package "aplicacao" {
+
     class GerenciadorDeUsuarios <<Control>> {
         - repositorio: RepositorioUsuario
         - repositorio_acessos: RepositorioRegistroDeAcesso
         + adicionar_usuario(...): Usuario
         + listar_usuarios(): list<Usuario>
-        + autenticar(email, senha): Usuario
+        + autenticar(login: str, senha: str): Usuario
     }
 
     class GerenciadorDeUnidades <<Control>> {
         - repositorio: RepositorioUnidadeBasicaSaude
         + adicionar_unidade(...): UnidadeBasicaSaude
-        + listar_unidades(apenas_ativas): list<UnidadeBasicaSaude>
-        + buscar_unidade_por_id(id): UnidadeBasicaSaude
+        + listar_unidades(apenas_ativas: bool): list<UnidadeBasicaSaude>
+        + buscar_unidade_por_id(id: int): UnidadeBasicaSaude
         + atualizar_unidade(...): UnidadeBasicaSaude
-        + remover_unidade(id): UnidadeBasicaSaude
+        + remover_unidade(id: int): UnidadeBasicaSaude
     }
 
     class FacadeSingletonController <<Facade>> <<Singleton>> {
         - {static} _instancia_unica: FacadeSingletonController
         - _gerenciador_usuarios: GerenciadorDeUsuarios
         - _gerenciador_unidades: GerenciadorDeUnidades
+
         + {static} instancia(): FacadeSingletonController
         + {static} resetar_instancia(): void
+
         + adicionar_usuario(...): Usuario
         + listar_usuarios(): list<Usuario>
-        + autenticar(email, senha): Usuario
+        + autenticar(login: str, senha: str): Usuario
+
         + adicionar_unidade(...): UnidadeBasicaSaude
-        + listar_unidades(apenas_ativas): list<UnidadeBasicaSaude>
-        + buscar_unidade_por_id(id): UnidadeBasicaSaude
+        + listar_unidades(apenas_ativas: bool): list<UnidadeBasicaSaude>
+        + buscar_unidade_por_id(id: int): UnidadeBasicaSaude
         + atualizar_unidade(...): UnidadeBasicaSaude
-        + remover_unidade(id): UnidadeBasicaSaude
+        + remover_unidade(id: int): UnidadeBasicaSaude
+
         + obter_quantidade_total_entidades_cadastradas(): int
     }
 
@@ -109,7 +215,7 @@ package "aplicacao / business" {
         + gerar(): str
         # _calcular_estatisticas(registros): EstatisticasDeAcesso
         # {abstract} _cabecalho(): str
-        # {abstract} _linha_por_email(estatistica): str
+        # {abstract} _linha_por_login(estatistica): str
         # {abstract} _rodape(estatisticas): str
     }
 
@@ -117,9 +223,29 @@ package "aplicacao / business" {
     class RelatorioDeAcessosCsv
 }
 
-package "adaptadores / infra" {
-    class RepositorioUsuarioEmMemoria <<Repository Adapter>>
-    class RepositorioUsuarioBancoDeDados <<Repository Adapter>>
+
+' ============================================================
+' ADAPTADORES / INFRAESTRUTURA
+' ============================================================
+
+package "adaptadores" {
+
+    class RepositorioUsuarioEmMemoria <<Repository Adapter>> {
+        + salvar(usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_cpf(cpf): Usuario | None
+        + buscar_por_email(email): Usuario | None
+        + buscar_por_login(login): Usuario | None
+    }
+
+    class RepositorioUsuarioBancoDeDados <<Repository Adapter>> {
+        + salvar(usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_cpf(cpf): Usuario | None
+        + buscar_por_email(email): Usuario | None
+        + buscar_por_login(login): Usuario | None
+    }
+
     class RepositorioUnidadeEmMemoria <<Repository Adapter>>
     class RepositorioRegistroDeAcessoEmMemoria <<Repository Adapter>>
 
@@ -131,34 +257,43 @@ package "adaptadores / infra" {
     }
 
     class AdaptadorArquivoDeLog <<Adapter>> {
-        + salvar(registro): RegistroDeAcesso
+        + salvar(registro: RegistroDeAcesso): RegistroDeAcesso
         + buscar_todos(): list<RegistroDeAcesso>
     }
 
     class ArquivoDeLogSimples <<Adaptee>> {
-        + anotar(linha): void
+        + anotar(linha: str): void
         + ler_linhas(): list<string>
     }
 }
 
-' -------------------- Relações principais --------------------
+
+' ============================================================
+' RELAÇÕES
+' ============================================================
 
 FacadeSingletonController --> GerenciadorDeUsuarios : delega
 FacadeSingletonController --> GerenciadorDeUnidades : delega
 
-GerenciadorDeUsuarios ..> RepositorioUsuario : usa porta
-GerenciadorDeUsuarios ..> RepositorioRegistroDeAcesso : registra acessos
+GerenciadorDeUsuarios ..> RepositorioUsuario : usa
+GerenciadorDeUsuarios ..> RepositorioRegistroDeAcesso : registra acesso
 GerenciadorDeUsuarios ..> Usuario : cria / autentica
+GerenciadorDeUsuarios ..> Senha : verifica senha
+GerenciadorDeUsuarios ..> LoginDuplicado : pode lançar
+GerenciadorDeUsuarios ..> CpfDuplicado : pode lançar
+GerenciadorDeUsuarios ..> CredenciaisInvalidas : pode lançar
+GerenciadorDeUsuarios ..> UsuarioInativo : pode lançar
 
-GerenciadorDeUnidades ..> RepositorioUnidadeBasicaSaude : usa porta
+GerenciadorDeUnidades ..> RepositorioUnidadeBasicaSaude : usa
 GerenciadorDeUnidades ..> UnidadeBasicaSaude : CRUD
 
-RelatorioDeAcessos ..> RepositorioRegistroDeAcesso : coleta registros
+RelatorioDeAcessos ..> RepositorioRegistroDeAcesso : consulta
 RelatorioDeAcessos <|-- RelatorioDeAcessosTexto
 RelatorioDeAcessos <|-- RelatorioDeAcessosCsv
 
 FabricaRepositorio <|.. FabricaRepositorioEmMemoria
 FabricaRepositorio <|.. FabricaRepositorioBancoDeDados
+
 SeletorFabrica ..> FabricaRepositorio : seleciona
 
 FabricaRepositorioEmMemoria ..> RepositorioUsuarioEmMemoria : cria
