@@ -23,33 +23,31 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 4**, co
 
 ## 1. Descrição dos 3 casos de uso mais relevantes
 
-### UC01 — Autenticar por perfil
+### UC01 — Autenticar usuário
 
 | Campo | Descrição |
 | ----- | --------- |
 | Atores principais | Administrador, Gestor da Unidade, Médico |
-| Objetivo | Permitir que o usuário acesse o sistema conforme seu perfil. |
+| Objetivo | Permitir que um usuário acesse o sistema por meio de login e senha, recebendo as permissões correspondentes ao seu perfil. |
 | Pré-condições | O usuário deve estar cadastrado e ativo. |
-| Pós-condições | O acesso é autorizado ou recusado, e a tentativa é registrada para estatísticas. |
-| Requisitos relacionados | RF03 — Autenticar por perfil; NF008 — Controle de acesso por perfil. |
+| Pós-condições | O acesso é autorizado ou recusado e a tentativa é registrada para fins de auditoria e estatísticas. |
+| Requisitos relacionados | RF03 — Autenticar usuários; NF008 — Controle de acesso por perfil. |
 
 **Fluxo principal**
 
-1. O usuário informa e-mail e senha.
+1. O usuário informa login e senha.
 2. O sistema valida se os campos obrigatórios foram preenchidos.
-3. O sistema consulta o usuário pelo e-mail.
-4. O sistema verifica a senha usando o hash armazenado.
+3. O sistema consulta o usuário pelo login.
+4. O sistema verifica a senha utilizando o hash armazenado.
 5. O sistema verifica se o usuário está ativo.
 6. O sistema registra a tentativa como `RegistroDeAcesso`.
-7. O sistema libera o acesso de acordo com o perfil do usuário.
+7. O sistema libera o acesso conforme o perfil do usuário.
 
 **Fluxos alternativos**
 
-- E-mail inexistente ou senha incorreta: o sistema lança `CredenciaisInvalidas`.
+- Login inexistente ou senha incorreta: o sistema lança `CredenciaisInvalidas`.
 - Usuário inativo: o sistema lança `UsuarioInativo`.
-- Campos obrigatórios ausentes: o sistema lança `ErroDeValidacao`.
-
----
+- Login ou senha ausentes: o sistema lança `ErroDeValidacao`.
 
 ### UC02 — Gerenciar usuários
 
@@ -59,25 +57,27 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 4**, co
 | Objetivo | Cadastrar e consultar usuários que operam o sistema. |
 | Pré-condições | O ator deve estar autenticado e possuir perfil autorizado. |
 | Pós-condições | O usuário é cadastrado ou listado conforme as regras de domínio. |
-| Requisitos relacionados | RF02 — Gerenciar gestores e médicos; NF008 — Controle de acesso por perfil. |
+| Requisitos relacionados | RF02 — Gerenciar gestores e médicos; RF03 — Autenticar usuários; NF008 — Controle de acesso por perfil. |
 
 **Fluxo principal**
 
 1. O ator solicita o cadastro de um novo usuário.
-2. O sistema recebe nome, CPF, e-mail, telefone, senha e perfil.
-3. O sistema valida os dados obrigatórios e a política de senha.
-4. O sistema verifica se já existe usuário com o mesmo CPF.
-5. O sistema cria a entidade `Usuario`.
-6. O sistema persiste o usuário por meio da porta `RepositorioUsuario`.
-7. O sistema permite listar os usuários cadastrados.
+2. O sistema recebe nome, CPF, e-mail, telefone, login, senha e perfil.
+3. O sistema valida os dados informados.
+4. O sistema verifica se o CPF já está cadastrado.
+5. O sistema verifica se o login já está cadastrado.
+6. O sistema cria a entidade `Usuario`.
+7. A senha é armazenada somente na forma de hash.
+8. O sistema persiste o usuário por meio da porta `RepositorioUsuario`.
+9. O sistema permite listar os usuários cadastrados.
 
 **Fluxos alternativos**
 
 - CPF já cadastrado: o sistema lança `CpfDuplicado`.
+- Login já cadastrado: o sistema lança `LoginDuplicado`.
 - Dados inválidos: o sistema lança `ErroDeValidacao`.
-- Falha de persistência: o sistema lança uma exceção específica de persistência.
+- Falha de persistência: o sistema lança a exceção correspondente.
 
----
 
 ### UC03 — Gerenciar Unidades Básicas de Saúde
 
@@ -107,7 +107,21 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 4**, co
 
 ---
 
-## 2. Diagrama de Casos de Uso
+## 2. Regras de negócio do usuário
+
+As principais regras atualmente implementadas são:
+
+- **RN01 — Login obrigatório:** todo usuário deve possuir login.
+- **RN02 — Tamanho do login:** o login deve possuir no máximo 12 caracteres.
+- **RN03 — Login único:** dois usuários não podem possuir o mesmo login.
+- **RN04 — Autenticação:** a autenticação utiliza login e senha.
+- **RN05 — E-mail válido:** o e-mail cadastrado deve possuir formato válido.
+- **RN06 — Tamanho da senha:** a senha deve possuir entre 8 e 128 caracteres.
+- **RN07 — Complexidade da senha:** a senha deve possuir pelo menos três entre os quatro grupos: letras maiúsculas, letras minúsculas, números e caracteres especiais.
+- **RN08 — Senha e dados pessoais:** a senha não pode ser igual ao nome ou ao e-mail.
+- **RN09 — Perfil:** o usuário deve possuir perfil Administrador, Gestor ou Médico.
+
+## 3. Diagrama de Casos de Uso
 
 O diagrama abaixo representa os casos de uso contemplados no contexto de gerenciamento
 até a Sprint 4: autenticação, gerenciamento de usuários, gerenciamento de UBS,
@@ -176,7 +190,7 @@ flowchart LR
 
 ---
 
-## 3. Diagrama de Classe de Análise até a Sprint 4
+## 4. Diagrama de Classe de Análise até a Sprint 4
 
 Este diagrama substitui a visão antiga do Laboratório 2 e representa o estado atual
 do projeto até a Sprint 4. Ele contempla:
@@ -436,7 +450,7 @@ O arquivo PlantUML específico da Sprint 3 está disponível em:
 
 ---
 
-## 5. Sprint 4 — Diagrama Final de Padrões de Projeto
+## 6. Sprint 4 — Diagrama Final de Padrões de Projeto
 
 A Sprint 4 consolida a separação entre a camada de negócio (`aplicacao` e `dominio`)
 e a camada de persistência/infraestrutura (`portas` e `adaptadores`).
@@ -457,7 +471,7 @@ O arquivo PlantUML do diagrama final está disponível em:
 
 ---
 
-## 6. Rastreabilidade
+## 7. Rastreabilidade
 
 | Caso de uso / item técnico | Requisito / Laboratório | Entrega |
 | -------------------------- | ------------------------ | ------- |
@@ -482,7 +496,7 @@ O arquivo PlantUML do diagrama final está disponível em:
 | Diagrama final de padrões | Sprint 4 (diagrama final) | Sprint 4 |
 ---
 
-## 7. Complemento — Casos de uso e diagrama de análise até Sprint 4
+## 8. Complemento — Casos de uso e diagrama de análise até Sprint 4
 
 A documentação complementar com a descrição dos três casos de uso mais relevantes,
 o diagrama de casos de uso atualizado e o diagrama de classe de análise até a
