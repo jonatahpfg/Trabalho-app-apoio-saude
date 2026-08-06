@@ -1,0 +1,282 @@
+@startuml
+title Diagrama de Classes — Sprint 5: Padrão Command
+
+skinparam classAttributeIconSize 0
+
+' ============================================================
+' DOMÍNIO
+' ============================================================
+
+package "dominio" {
+
+    class Usuario <<Entity>> {
+        - id: int | None
+        - nome: str
+        - cpf: str
+        - email: str
+        - telefone: str
+        - login: str
+        - senha_hash: str
+        - perfil: Perfil
+        - ativo: bool
+        + criar(...): Usuario
+    }
+
+    enum Perfil {
+        ADMINISTRADOR
+        GESTOR
+        MEDICO
+    }
+
+    class UnidadeBasicaSaude <<Entity>> {
+        - id: int | None
+        - nome: str
+        - cnpj: str
+        - endereco: str
+        - telefone: str
+        - ativa: bool
+        + criar(...): UnidadeBasicaSaude
+    }
+
+    class RegistroDeAcesso <<Entity>> {
+        - id: int | None
+        - login: str
+        - sucesso: bool
+        - data_hora: datetime
+        + criar(...): RegistroDeAcesso
+    }
+
+    class Senha <<Utility>> {
+        + {static} gerar_hash(senha: str): str
+        + {static} verificar(senha: str, senha_hash: str): bool
+    }
+
+    Usuario --> Perfil : possui
+    Usuario ..> Senha : gera hash
+}
+
+' ============================================================
+' VALIDAÇÕES DO DOMÍNIO
+' ============================================================
+
+package "dominio.validacoes" {
+
+    class ValidadorTextoObrigatorio <<Validator>> {
+        + {static} validar(valor: str, campo: str): str
+    }
+
+    class ValidadorLogin <<Validator>> {
+        + {static} validar(login: str): str
+    }
+
+    class ValidadorEmail <<Validator>> {
+        + {static} validar(email: str): str
+    }
+
+    class ValidadorSenha <<Validator>> {
+        + {static} validar(senha: str, nome: str, email: str): str
+    }
+
+    class ValidadorPerfil <<Validator>> {
+        + {static} validar(perfil, tipo_perfil)
+    }
+
+    ValidadorLogin ..> ValidadorTextoObrigatorio
+    ValidadorEmail ..> ValidadorTextoObrigatorio
+    ValidadorSenha ..> ValidadorTextoObrigatorio
+}
+
+Usuario ..> ValidadorTextoObrigatorio : valida campos
+Usuario ..> ValidadorLogin : valida login
+Usuario ..> ValidadorEmail : valida e-mail
+Usuario ..> ValidadorSenha : valida senha
+Usuario ..> ValidadorPerfil : valida perfil
+
+' ============================================================
+' PORTAS (INTERFACES)
+' ============================================================
+
+package "portas" {
+
+    interface RepositorioUsuario <<Repository>> {
+        + salvar(usuario: Usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_cpf(cpf: str): Usuario | None
+        + buscar_por_login(login: str): Usuario | None
+    }
+
+    interface RepositorioUnidadeBasicaSaude <<Repository>> {
+        + salvar(unidade: UnidadeBasicaSaude): UnidadeBasicaSaude
+        + buscar_todas(): list<UnidadeBasicaSaude>
+        + buscar_por_id(id: int): UnidadeBasicaSaude | None
+        + buscar_por_cnpj(cnpj: str): UnidadeBasicaSaude | None
+    }
+
+    interface RepositorioRegistroDeAcesso <<Repository>> {
+        + salvar(registro: RegistroDeAcesso): RegistroDeAcesso
+        + buscar_todos(): list<RegistroDeAcesso>
+    }
+
+    interface FabricaRepositorio <<Abstract Factory>> {
+        + criar_repositorio_usuario(): RepositorioUsuario
+        + criar_repositorio_unidade_basica_saude(): RepositorioUnidadeBasicaSaude
+        + criar_repositorio_registro_de_acesso(): RepositorioRegistroDeAcesso
+    }
+}
+
+' ============================================================
+' APLICAÇÃO — GERENCIADORES E FACHADA
+' ============================================================
+
+package "aplicacao" {
+
+    class GerenciadorDeUsuarios <<Control>> {
+        - repositorio: RepositorioUsuario
+        - repositorio_acessos: RepositorioRegistroDeAcesso
+        + adicionar_usuario(...): Usuario
+        + listar_usuarios(): list<Usuario>
+        + autenticar(login: str, senha: str): Usuario
+    }
+
+    class GerenciadorDeUnidades <<Control>> {
+        - repositorio: RepositorioUnidadeBasicaSaude
+        + adicionar_unidade(...): UnidadeBasicaSaude
+        + listar_unidades(apenas_ativas: bool): list<UnidadeBasicaSaude>
+        + buscar_unidade_por_id(id: int): UnidadeBasicaSaude
+        + atualizar_unidade(...): UnidadeBasicaSaude
+        + remover_unidade(id: int): UnidadeBasicaSaude
+    }
+
+    class FacadeSingletonController <<Facade>> <<Singleton>> {
+        - {static} _instancia_unica: FacadeSingletonController
+        - _gerenciador_usuarios: GerenciadorDeUsuarios
+        - _gerenciador_unidades: GerenciadorDeUnidades
+        - _executor: ExecutorDeComandos
+
+        + {static} instancia(): FacadeSingletonController
+        + {static} resetar_instancia(): void
+
+        + executar_comando(comando: Comando): Any
+        + adicionar_usuario(...): Usuario
+        + listar_usuarios(): list<Usuario>
+        + autenticar(login: str, senha: str): Usuario
+
+        + adicionar_unidade(...): UnidadeBasicaSaude
+        + listar_unidades(apenas_ativas: bool): list<UnidadeBasicaSaude>
+        + buscar_unidade_por_id(id: int): UnidadeBasicaSaude
+        + atualizar_unidade(...): UnidadeBasicaSaude
+        + remover_unidade(id: int): UnidadeBasicaSaude
+
+        + obter_quantidade_total_entidades_cadastradas(): int
+    }
+
+    abstract class RelatorioDeAcessos <<Template Method>> {
+        + gerar(): str
+        # _calcular_estatisticas(registros): EstatisticasDeAcesso
+        # {abstract} _cabecalho(): str
+        # {abstract} _linha_por_login(estatistica): str
+        # {abstract} _rodape(estatisticas): str
+    }
+
+    class RelatorioDeAcessosTexto <<Concrete Template>>
+    class RelatorioDeAcessosCsv <<Concrete Template>>
+
+    RelatorioDeAcessos <|-- RelatorioDeAcessosTexto
+    RelatorioDeAcessos <|-- RelatorioDeAcessosCsv
+}
+
+' ============================================================
+' APLICAÇÃO — PADRÃO COMMAND
+' ============================================================
+
+package "aplicacao.comandos" {
+
+    interface Comando <<Command>> {
+        + {abstract} executar(): Any
+    }
+
+    class ExecutorDeComandos <<Invoker>> {
+        - _historico: list<Comando>
+        + executar(comando: Comando): Any
+        + historico: list<Comando>
+        + ultimo_comando: Comando | None
+        + limpar_historico(): void
+    }
+
+    class ComandoAdicionarUsuario <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        + executar(): Usuario
+    }
+
+    class ComandoListarUsuarios <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        + executar(): list<Usuario>
+    }
+
+    class ComandoAutenticarUsuario <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        + executar(): Usuario
+    }
+
+    class ComandoAdicionarUnidade <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): UnidadeBasicaSaude
+    }
+
+    class ComandoListarUnidades <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): list<UnidadeBasicaSaude>
+    }
+
+    class ComandoBuscarUnidadePorId <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): UnidadeBasicaSaude
+    }
+
+    class ComandoAtualizarUnidade <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): UnidadeBasicaSaude
+    }
+
+    class ComandoRemoverUnidade <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): UnidadeBasicaSaude
+    }
+
+    class ComandoContarTotalEntidades <<Concrete Command>> {
+        - _gerenciador_usuarios: GerenciadorDeUsuarios
+        - _gerenciador_unidades: GerenciadorDeUnidades
+        + executar(): int
+    }
+
+    Comando <|.. ComandoAdicionarUsuario
+    Comando <|.. ComandoListarUsuarios
+    Comando <|.. ComandoAutenticarUsuario
+    Comando <|.. ComandoAdicionarUnidade
+    Comando <|.. ComandoListarUnidades
+    Comando <|.. ComandoBuscarUnidadePorId
+    Comando <|.. ComandoAtualizarUnidade
+    Comando <|.. ComandoRemoverUnidade
+    Comando <|.. ComandoContarTotalEntidades
+
+    ExecutorDeComandos o--> Comando : executa e guarda histórico
+}
+
+FacadeSingletonController --> ExecutorDeComandos : delega execução
+FacadeSingletonController ..> Comando : instancia
+ComandoAdicionarUsuario --> GerenciadorDeUsuarios : invoca
+ComandoListarUsuarios --> GerenciadorDeUsuarios : invoca
+ComandoAutenticarUsuario --> GerenciadorDeUsuarios : invoca
+ComandoAdicionarUnidade --> GerenciadorDeUnidades : invoca
+ComandoListarUnidades --> GerenciadorDeUnidades : invoca
+ComandoBuscarUnidadePorId --> GerenciadorDeUnidades : invoca
+ComandoAtualizarUnidade --> GerenciadorDeUnidades : invoca
+ComandoRemoverUnidade --> GerenciadorDeUnidades : invoca
+ComandoContarTotalEntidades --> GerenciadorDeUsuarios : invoca
+ComandoContarTotalEntidades --> GerenciadorDeUnidades : invoca
+
+GerenciadorDeUsuarios ..> RepositorioUsuario : usa
+GerenciadorDeUsuarios ..> RepositorioRegistroDeAcesso : registra acesso
+GerenciadorDeUnidades ..> RepositorioUnidadeBasicaSaude : usa
+
+@enduml

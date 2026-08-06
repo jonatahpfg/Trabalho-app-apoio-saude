@@ -1,20 +1,33 @@
-"""Controlador que aplica os padrões GoF Facade e Singleton.
+"""Controlador que aplica os padrões GoF Facade, Singleton e Command.
 
-Sprint 3 — Padrões 1: a fachada agora integra tanto o GerenciadorDeUsuarios
-quanto o GerenciadorDeUnidades, e expõe o método
-``obter_quantidade_total_entidades_cadastradas`` conforme solicitado.
+A fachada integra o GerenciadorDeUsuarios e o GerenciadorDeUnidades,
+utilizando o padrão Command para desacoplar as operações de negócio e
+centralizar a execução através do ExecutorDeComandos.
 """
 
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..adaptadores.seletor_fabrica import obter_fabrica_repositorio
 from ..aplicacao.gerenciador_de_unidades import GerenciadorDeUnidades
 from ..aplicacao.gerenciador_de_usuarios import GerenciadorDeUsuarios
 from ..dominio.unidade_basica_saude import UnidadeBasicaSaude
 from ..dominio.usuario import Perfil, Usuario
+from .comandos import (
+    Comando,
+    ComandoAdicionarUnidade,
+    ComandoAdicionarUsuario,
+    ComandoAtualizarUnidade,
+    ComandoAutenticarUsuario,
+    ComandoBuscarUnidadePorId,
+    ComandoContarTotalEntidades,
+    ComandoListarUnidades,
+    ComandoListarUsuarios,
+    ComandoRemoverUnidade,
+    ExecutorDeComandos,
+)
 
 if TYPE_CHECKING:
     from ..portas.repositorio_registro_de_acesso import RepositorioRegistroDeAcesso
@@ -32,8 +45,8 @@ class FacadeSingletonController:
     Aplica o padrão **Singleton** garantindo uma única instância por processo,
     criada na primeira chamada a ``instancia()``.
 
-    Sprint 3 — inclui o método ``obter_quantidade_total_entidades_cadastradas``
-    que retorna a soma de todas as entidades persistidas no sistema.
+    Aplica o padrão **Command** convertendo cada requisição em um objeto de
+    comando e delegando sua execução ao ``ExecutorDeComandos``.
     """
 
     # atributo de classe que guarda a instância única (Singleton)
@@ -44,6 +57,7 @@ class FacadeSingletonController:
         repositorio_usuarios: RepositorioUsuario,
         repositorio_unidades: RepositorioUnidadeBasicaSaude,
         repositorio_acessos: RepositorioRegistroDeAcesso | None = None,
+        executor: ExecutorDeComandos | None = None,
     ) -> None:
         self._gerenciador_usuarios = GerenciadorDeUsuarios(
             repositorio_usuarios,
@@ -52,6 +66,12 @@ class FacadeSingletonController:
         self._gerenciador_unidades = GerenciadorDeUnidades(
             repositorio_unidades
         )
+        self._executor = executor or ExecutorDeComandos()
+
+    @property
+    def executor(self) -> ExecutorDeComandos:
+        """Retorna o executor de comandos associado à fachada."""
+        return self._executor
 
     @classmethod
     def instancia(cls) -> FacadeSingletonController:
@@ -89,7 +109,13 @@ class FacadeSingletonController:
         """Reseta a instância única. Usado apenas nos testes."""
         cls._instancia_unica = None
 
-    # --- Facade: interface simplificada para o subsistema ---
+    # --- Execução genérica via Command ---
+
+    def executar_comando(self, comando: Comando) -> Any:
+        """Executa qualquer comando concreto diretamente pelo executor da fachada."""
+        return self._executor.executar(comando)
+
+    # --- Facade: interface simplificada para o subsistema via Comandos ---
 
     # ---- Usuários ----
 
@@ -104,7 +130,8 @@ class FacadeSingletonController:
         senha: str,
         perfil: Perfil | str,
     ) -> Usuario:
-        return self._gerenciador_usuarios.adicionar_usuario(
+        comando = ComandoAdicionarUsuario(
+            self._gerenciador_usuarios,
             nome=nome,
             cpf=cpf,
             email=email,
@@ -113,15 +140,19 @@ class FacadeSingletonController:
             senha=senha,
             perfil=perfil,
         )
+        return self._executor.executar(comando)
 
     def listar_usuarios(self) -> list[Usuario]:
-        return self._gerenciador_usuarios.listar_usuarios()
+        comando = ComandoListarUsuarios(self._gerenciador_usuarios)
+        return self._executor.executar(comando)
 
     def autenticar(self, *, login: str, senha: str) -> Usuario:
-        return self._gerenciador_usuarios.autenticar(
+        comando = ComandoAutenticarUsuario(
+            self._gerenciador_usuarios,
             login=login,
             senha=senha,
         )
+        return self._executor.executar(comando)
 
     # ---- Unidades Básicas de Saúde ----
 
@@ -133,29 +164,35 @@ class FacadeSingletonController:
         endereco: str,
         telefone: str,
     ) -> UnidadeBasicaSaude:
-        return self._gerenciador_unidades.adicionar_unidade(
+        comando = ComandoAdicionarUnidade(
+            self._gerenciador_unidades,
             nome=nome,
             cnpj=cnpj,
             endereco=endereco,
             telefone=telefone,
         )
+        return self._executor.executar(comando)
 
     def listar_unidades(
         self,
         *,
         apenas_ativas: bool = False,
     ) -> list[UnidadeBasicaSaude]:
-        return self._gerenciador_unidades.listar_unidades(
-            apenas_ativas=apenas_ativas
+        comando = ComandoListarUnidades(
+            self._gerenciador_unidades,
+            apenas_ativas=apenas_ativas,
         )
+        return self._executor.executar(comando)
 
     def buscar_unidade_por_id(
         self,
         unidade_id: int,
     ) -> UnidadeBasicaSaude:
-        return self._gerenciador_unidades.buscar_unidade_por_id(
-            unidade_id
+        comando = ComandoBuscarUnidadePorId(
+            self._gerenciador_unidades,
+            unidade_id=unidade_id,
         )
+        return self._executor.executar(comando)
 
     def atualizar_unidade(
         self,
@@ -166,34 +203,39 @@ class FacadeSingletonController:
         endereco: str,
         telefone: str,
     ) -> UnidadeBasicaSaude:
-        return self._gerenciador_unidades.atualizar_unidade(
+        comando = ComandoAtualizarUnidade(
+            self._gerenciador_unidades,
             unidade_id=unidade_id,
             nome=nome,
             cnpj=cnpj,
             endereco=endereco,
             telefone=telefone,
         )
+        return self._executor.executar(comando)
 
     def remover_unidade(
         self,
         unidade_id: int,
     ) -> UnidadeBasicaSaude:
-        return self._gerenciador_unidades.remover_unidade(
-            unidade_id
+        comando = ComandoRemoverUnidade(
+            self._gerenciador_unidades,
+            unidade_id=unidade_id,
         )
+        return self._executor.executar(comando)
 
-    # ---- Método exigido pela Sprint 3 ----
+    # ---- Método de contagem de entidades ----
 
     def obter_quantidade_total_entidades_cadastradas(self) -> int:
         """Retorna a quantidade total de entidades cadastradas no sistema.
 
         Soma o total de usuários e de unidades básicas de saúde persistidos.
         """
-        total_usuarios = len(
-            self._gerenciador_usuarios.listar_usuarios()
+        comando = ComandoContarTotalEntidades(
+            self._gerenciador_usuarios,
+            self._gerenciador_unidades,
         )
-        total_unidades = len(
-            self._gerenciador_unidades.listar_unidades()
-        )
+        return self._executor.executar(comando)
 
-        return total_usuarios + total_unidades
+
+# Alias semântico para a Fachada do Sistema
+FacadeDoSistema = FacadeSingletonController

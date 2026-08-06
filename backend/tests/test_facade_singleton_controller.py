@@ -322,3 +322,128 @@ class TestFacadeAutenticar:
                 login="carlos",
                 senha="",
             )
+
+
+# ------------------------------------------------------------------ #
+# Testes do padrão Facade — Unidades Básicas de Saúde (UBS)           #
+# ------------------------------------------------------------------ #
+
+
+class TestFacadeUnidadeBasicaSaude:
+    def test_crud_completo_ubs_via_facade(self):
+        facade = FacadeSingletonController.instancia()
+
+        # Adicionar
+        unidade = facade.adicionar_unidade(
+            nome="UBS Centro",
+            cnpj="12345678000199",
+            endereco="Rua Principal, 100",
+            telefone="84999990000",
+        )
+        assert unidade.id == 1
+        assert unidade.nome == "UBS Centro"
+        assert unidade.ativa is True
+
+        # Listar
+        unidades = facade.listar_unidades()
+        assert len(unidades) == 1
+
+        # Buscar por ID
+        buscada = facade.buscar_unidade_por_id(unidade.id)
+        assert buscada.cnpj == "12345678000199"
+
+        # Atualizar
+        atualizada = facade.atualizar_unidade(
+            unidade_id=unidade.id,
+            nome="UBS Centro Atualizada",
+            cnpj="12345678000199",
+            endereco="Rua Nova, 200",
+            telefone="84988887777",
+        )
+        assert atualizada.nome == "UBS Centro Atualizada"
+        assert atualizada.endereco == "Rua Nova, 200"
+
+        # Remover (lógico)
+        removida = facade.remover_unidade(unidade.id)
+        assert removida.ativa is False
+        assert facade.listar_unidades(apenas_ativas=True) == []
+
+
+# ------------------------------------------------------------------ #
+# Testes do padrão Command na Facade                                 #
+# ------------------------------------------------------------------ #
+
+
+class TestFacadeIntegracaoCommand:
+    def test_facade_possui_executor_de_comandos(self):
+        facade = FacadeSingletonController.instancia()
+        from gestao_usuarios.aplicacao.comandos import ExecutorDeComandos
+
+        assert isinstance(facade.executor, ExecutorDeComandos)
+
+    def test_operacoes_da_facade_registram_comandos_no_executor(self):
+        facade = FacadeSingletonController.instancia()
+        from gestao_usuarios.aplicacao.comandos import (
+            ComandoAdicionarUnidade,
+            ComandoAdicionarUsuario,
+            ComandoContarTotalEntidades,
+            ComandoListarUsuarios,
+        )
+
+        facade.adicionar_usuario(
+            nome="Ana",
+            cpf="12345678901",
+            email="ana@ubs.gov.br",
+            telefone="84999990000",
+            login="ana",
+            senha="SenhaSecreta1!",
+            perfil=Perfil.ADMINISTRADOR,
+        )
+        assert isinstance(facade.executor.ultimo_comando, ComandoAdicionarUsuario)
+
+        facade.listar_usuarios()
+        assert isinstance(facade.executor.ultimo_comando, ComandoListarUsuarios)
+
+        facade.adicionar_unidade(
+            nome="UBS Central",
+            cnpj="12345678000199",
+            endereco="Rua Central, 1",
+            telefone="84999991111",
+        )
+        assert isinstance(facade.executor.ultimo_comando, ComandoAdicionarUnidade)
+
+        total = facade.obter_quantidade_total_entidades_cadastradas()
+        assert total == 2
+        assert isinstance(facade.executor.ultimo_comando, ComandoContarTotalEntidades)
+
+    def test_executar_comando_diretamente_pela_facade(self):
+        facade = FacadeSingletonController.instancia()
+        from gestao_usuarios.aplicacao.comandos import (
+            ComandoAdicionarUsuario,
+            ComandoListarUsuarios,
+        )
+
+        cmd_add = ComandoAdicionarUsuario(
+            facade._gerenciador_usuarios,
+            nome="Bruno",
+            cpf="98765432100",
+            email="bruno@ubs.gov.br",
+            telefone="84988887777",
+            login="bruno",
+            senha="OutraSenha2@",
+            perfil=Perfil.MEDICO,
+        )
+
+        usuario = facade.executar_comando(cmd_add)
+        assert usuario.nome == "Bruno"
+
+        cmd_list = ComandoListarUsuarios(facade._gerenciador_usuarios)
+        usuarios = facade.executar_comando(cmd_list)
+        assert len(usuarios) == 1
+
+    def test_alias_facade_do_sistema(self):
+        from gestao_usuarios.aplicacao.facade_singleton_controller import (
+            FacadeDoSistema,
+        )
+
+        assert FacadeDoSistema is FacadeSingletonController
