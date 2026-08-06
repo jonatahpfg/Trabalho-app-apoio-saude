@@ -14,7 +14,7 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 4**, co
 - registro de acessos dos usuários;
 - relatórios de estatísticas de acesso;
 - separação entre business e persistência por Repository;
-- padrões Factory Method, Abstract Factory, Adapter, Template Method, Facade e Singleton.
+- padrões Factory Method, Abstract Factory, Adapter, Template Method, Facade, Singleton e Command.
 
 > O **Paciente** e o módulo de triagem clínica aparecem no escopo geral do produto,
 > mas ainda não fazem parte deste contexto implementado no backend até a Sprint 4.
@@ -310,16 +310,51 @@ classDiagram
         -instancia_unica: FacadeSingletonController
         -gerenciador_usuarios: GerenciadorDeUsuarios
         -gerenciador_unidades: GerenciadorDeUnidades
+        -executor: ExecutorDeComandos
         +instancia() FacadeSingletonController
         +adicionar_usuario(dados) Usuario
         +listar_usuarios() List~Usuario~
-        +autenticar(email, senha) Usuario
+        +autenticar(login, senha) Usuario
         +adicionar_unidade(dados) UnidadeBasicaSaude
         +listar_unidades() List~UnidadeBasicaSaude~
         +atualizar_unidade(dados) UnidadeBasicaSaude
         +remover_unidade(id) UnidadeBasicaSaude
+        +executar_comando(comando) Any
         +obter_quantidade_total_entidades_cadastradas() int
     }
+
+    class ExecutorDeComandos {
+        <<Invoker>>
+        -historico: List~Comando~
+        +executar(comando) Any
+        +limpar_historico()
+    }
+
+    class Comando {
+        <<Command>>
+        <<interface>>
+        +executar()* Any
+    }
+
+    class ComandoAdicionarUsuario
+    class ComandoListarUsuarios
+    class ComandoAutenticarUsuario
+    class ComandoAdicionarUnidade
+    class ComandoListarUnidades
+    class ComandoBuscarUnidadePorId
+    class ComandoAtualizarUnidade
+    class ComandoRemoverUnidade
+    class ComandoContarTotalEntidades
+
+    Comando <|.. ComandoAdicionarUsuario
+    Comando <|.. ComandoListarUsuarios
+    Comando <|.. ComandoAutenticarUsuario
+    Comando <|.. ComandoAdicionarUnidade
+    Comando <|.. ComandoListarUnidades
+    Comando <|.. ComandoBuscarUnidadePorId
+    Comando <|.. ComandoAtualizarUnidade
+    Comando <|.. ComandoRemoverUnidade
+    Comando <|.. ComandoContarTotalEntidades
 
     GerenciadorDeUsuarios ..> RepositorioUsuario : usa porta
     GerenciadorDeUsuarios ..> RepositorioRegistroDeAcesso : registra acessos
@@ -328,8 +363,19 @@ classDiagram
     GerenciadorDeUnidades ..> RepositorioUnidadeBasicaSaude : usa porta
     GerenciadorDeUnidades ..> UnidadeBasicaSaude : CRUD
 
-    FacadeSingletonController --> GerenciadorDeUsuarios : delega
-    FacadeSingletonController --> GerenciadorDeUnidades : delega
+    FacadeSingletonController --> ExecutorDeComandos : usa invoker
+    FacadeSingletonController ..> Comando : instancia comandos
+    ExecutorDeComandos --> Comando : executa
+    ComandoAdicionarUsuario --> GerenciadorDeUsuarios : invoca
+    ComandoListarUsuarios --> GerenciadorDeUsuarios : invoca
+    ComandoAutenticarUsuario --> GerenciadorDeUsuarios : invoca
+    ComandoAdicionarUnidade --> GerenciadorDeUnidades : invoca
+    ComandoListarUnidades --> GerenciadorDeUnidades : invoca
+    ComandoBuscarUnidadePorId --> GerenciadorDeUnidades : invoca
+    ComandoAtualizarUnidade --> GerenciadorDeUnidades : invoca
+    ComandoRemoverUnidade --> GerenciadorDeUnidades : invoca
+    ComandoContarTotalEntidades --> GerenciadorDeUsuarios : invoca
+    ComandoContarTotalEntidades --> GerenciadorDeUnidades : invoca
 
     %% =======================
     %% Factory / Seleção de repositórios
@@ -468,10 +514,23 @@ O arquivo PlantUML do diagrama final está disponível em:
 | Template Method | `RelatorioDeAcessos.gerar()` com `RelatorioDeAcessosTexto` e `RelatorioDeAcessosCsv` |
 | Facade | `FacadeSingletonController` |
 | Singleton | `FacadeSingletonController.instancia()` |
+| Command | `Comando`, `ExecutorDeComandos`, comandos em `gestao_usuarios.aplicacao.comandos` e `FacadeSingletonController` |
 
 ---
 
-## 7. Rastreabilidade
+## 7. Sprint 5 — Padrão Command
+
+A Sprint 5 refatora a camada de aplicação para integrar o padrão **Command (GoF)**, desacoplando a fachada (`FacadeSingletonController` / `FacadeDoSistema`) dos gerenciadores (`GerenciadorDeUsuarios` e `GerenciadorDeUnidades`) e centralizando o disparo das operações de negócio no `ExecutorDeComandos`.
+
+### Padrão Command
+
+*Classes participantes:* `Comando`, `ComandoAdicionarUsuario`, `ComandoListarUsuarios`, `ComandoAutenticarUsuario`, `ComandoAdicionarUnidade`, `ComandoListarUnidades`, `ComandoBuscarUnidadePorId`, `ComandoAtualizarUnidade`, `ComandoRemoverUnidade`, `ComandoContarTotalEntidades`, `ExecutorDeComandos` e `FacadeSingletonController` (`FacadeDoSistema`).
+
+*Objetivo:* encapsular as operações da camada de negócio como objetos, reduzindo o acoplamento entre a fachada e os gerenciadores e permitindo organizar a execução das ações do sistema.
+
+---
+
+## 8. Rastreabilidade
 
 | Caso de uso / item técnico | Requisito / Laboratório | Entrega |
 | -------------------------- | ------------------------ | ------- |
