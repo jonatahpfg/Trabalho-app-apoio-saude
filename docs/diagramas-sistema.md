@@ -731,16 +731,44 @@ A Sprint 6 introduz dois novos padrões GoF na camada de aplicação:
 
 #### Matriz de Permissões
 
+**Usuários**
+
 | Operação | ADMINISTRADOR | GESTOR | MÉDICO |
 |---|:---:|:---:|:---:|
 | `adicionar_usuario` | ✅ | ❌ | ❌ |
 | `listar_usuarios` | ✅ | ✅ | ❌ |
+| `buscar_usuario_por_id` | ✅ | ✅ | ❌ |
+| `buscar_usuario_por_login` | ✅ | ✅ | ❌ |
+| `atualizar_usuario` | ✅ | ❌ | ❌ |
+| `desativar_usuario` | ✅ | ❌ | ❌ |
+| `reativar_usuario` | ✅ | ❌ | ❌ |
 | `autenticar` | ✅ | ✅ | ✅ |
+
+O cadastro de usuário guarda dado pessoal: a leitura fica restrita aos perfis
+que já podiam listar, e toda escrita — incluir, alterar, desativar e reativar —
+é privativa do ADMINISTRADOR. `atualizar_usuario` é a operação mais sensível do
+cadastro, porque altera perfil e senha: sem essa restrição, um perfil não
+autorizado poderia promover a si mesmo a ADMINISTRADOR.
+
+**Unidades Básicas de Saúde**
+
+| Operação | ADMINISTRADOR | GESTOR | MÉDICO |
+|---|:---:|:---:|:---:|
 | `adicionar_unidade` | ✅ | ✅ | ❌ |
 | `listar_unidades` | ✅ | ✅ | ✅ |
 | `buscar_unidade_por_id` | ✅ | ✅ | ✅ |
 | `atualizar_unidade` | ✅ | ✅ | ❌ |
+| `desfazer_ultima_atualizacao_de_unidade` | ✅ | ✅ | ❌ |
 | `remover_unidade` | ✅ | ❌ | ❌ |
+
+Desfazer reescreve os dados da unidade, então exige os mesmos perfis de
+`atualizar_unidade`: é a operação que ela reverte.
+
+> **Cobertura da autorização.** O Proxy só protege o que intercepta. Para que
+> uma operação nova no gerenciador não fique acessível sem verificação de
+> perfil, `tests/test_cobertura_dos_proxies.py` compara a superfície pública
+> dos gerenciadores com a dos Proxies e falha quando alguma operação passa a
+> não ser interceptada ou delega sem chamar `_verificar_perfil`.
 
 #### Diagrama de Classes — Proxy
 
@@ -749,7 +777,12 @@ classDiagram
     class GerenciadorDeUsuarios {
         <<RealSubject>>
         +adicionar_usuario(dados) Usuario
-        +listar_usuarios() List~Usuario~
+        +listar_usuarios(apenas_ativos) List~Usuario~
+        +buscar_usuario_por_id(id) Usuario
+        +buscar_usuario_por_login(login) Usuario
+        +atualizar_usuario(dados) Usuario
+        +desativar_usuario(id) Usuario
+        +reativar_usuario(id) Usuario
         +autenticar(login, senha) Usuario
     }
 
@@ -758,7 +791,12 @@ classDiagram
         -gerenciador: GerenciadorDeUsuarios
         -usuario_autenticado: Usuario
         +adicionar_usuario(dados) Usuario
-        +listar_usuarios() List~Usuario~
+        +listar_usuarios(apenas_ativos) List~Usuario~
+        +buscar_usuario_por_id(id) Usuario
+        +buscar_usuario_por_login(login) Usuario
+        +atualizar_usuario(dados) Usuario
+        +desativar_usuario(id) Usuario
+        +reativar_usuario(id) Usuario
         +autenticar(login, senha) Usuario
         -_verificar_perfil(perfis, operacao)
     }
@@ -766,9 +804,10 @@ classDiagram
     class GerenciadorDeUnidades {
         <<RealSubject>>
         +adicionar_unidade(dados) UnidadeBasicaSaude
-        +listar_unidades() List~UnidadeBasicaSaude~
+        +listar_unidades(apenas_ativas) List~UnidadeBasicaSaude~
         +buscar_unidade_por_id(id) UnidadeBasicaSaude
         +atualizar_unidade(dados) UnidadeBasicaSaude
+        +desfazer_ultima_atualizacao_de_unidade() UnidadeBasicaSaude
         +remover_unidade(id) UnidadeBasicaSaude
     }
 
@@ -777,9 +816,10 @@ classDiagram
         -gerenciador: GerenciadorDeUnidades
         -usuario_autenticado: Usuario
         +adicionar_unidade(dados) UnidadeBasicaSaude
-        +listar_unidades() List~UnidadeBasicaSaude~
+        +listar_unidades(apenas_ativas) List~UnidadeBasicaSaude~
         +buscar_unidade_por_id(id) UnidadeBasicaSaude
         +atualizar_unidade(dados) UnidadeBasicaSaude
+        +desfazer_ultima_atualizacao_de_unidade() UnidadeBasicaSaude
         +remover_unidade(id) UnidadeBasicaSaude
         -_verificar_perfil(perfis, operacao)
     }
@@ -967,6 +1007,9 @@ O diagrama PlantUML correspondente está em:
 | Proxy — Autorização por Perfil | Sprint 6 (Proxy) | Sprint 6 |
 | Observer — Eventos de Autenticação | Sprint 6 (Observer) | Sprint 6 |
 | Matriz de Permissões | Sprint 6 (Proxy) | Sprint 6 |
+| Autorização das operações de CRUD de usuário | Sprint 6 (Proxy) / Sprint 7 | Sprint 7 |
+| Autorização do desfazer de UBS | Sprint 6 (Proxy + Memento) | Sprint 7 |
+| Teste de cobertura dos Proxies | Sprint 6 (Proxy) | Sprint 7 |
 
 ---
 

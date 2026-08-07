@@ -306,6 +306,36 @@ def main() -> None:
     except AcessoNegado as e:
         print(f"[PROXY] MÉDICO adiciona usuário → AcessoNegado: {e}")
 
+    # Cenário C2: GESTOR tenta alterar o cadastro de um usuário (negado).
+    # É a operação mais sensível: altera perfil e senha.
+    proxy_gestor_usr = ProxyGerenciadorDeUsuarios(gerenciador, gestor)
+
+    try:
+        proxy_gestor_usr.atualizar_usuario(
+            usuario_id=admin.id,
+            nome=admin.nome,
+            cpf=admin.cpf,
+            email=admin.email,
+            telefone=admin.telefone,
+            login=admin.login,
+            perfil=Perfil.MEDICO,
+        )
+        print("[PROXY] GESTOR atualiza usuário → OK")
+    except AcessoNegado as e:
+        print(f"[PROXY] GESTOR atualiza usuário → AcessoNegado: {e}")
+
+    # Cenário C3: ADMINISTRADOR desativa e reativa um usuário (permitido)
+    try:
+        alvo = proxy_admin_usr.buscar_usuario_por_login("bruno")
+        desativado = proxy_admin_usr.desativar_usuario(alvo.id)
+        print(
+            f"[PROXY] ADMINISTRADOR desativa usuário → OK "
+            f"(login={desativado.login}, ativo={desativado.ativo})"
+        )
+        proxy_admin_usr.reativar_usuario(alvo.id)
+    except AcessoNegado as e:
+        print(f"[PROXY] Acesso negado: {e}")
+
     # Cenário D: GESTOR adiciona UBS (permitido)
     try:
         ubs = proxy_gestor_ubs.adicionar_unidade(
