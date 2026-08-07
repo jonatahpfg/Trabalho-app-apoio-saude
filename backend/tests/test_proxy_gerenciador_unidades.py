@@ -198,6 +198,64 @@ class TestRemoverUnidade:
 
 
 # ---------------------------------------------------------------------------
+# desfazer_ultima_atualizacao_de_unidade
+# ---------------------------------------------------------------------------
+
+
+class TestDesfazerAtualizacaoDeUnidade:
+    def _criar_e_atualizar(self, proxy):
+        ubs = proxy.adicionar_unidade(**_dados_ubs("81"))
+        proxy.atualizar_unidade(
+            unidade_id=ubs.id,
+            nome="UBS Reformada",
+            cnpj=ubs.cnpj,
+            endereco="Rua Nova, 200",
+            telefone="84300000009",
+        )
+        return ubs
+
+    def test_administrador_pode_desfazer(self, proxy_admin):
+        ubs = self._criar_e_atualizar(proxy_admin)
+
+        restaurada = proxy_admin.desfazer_ultima_atualizacao_de_unidade()
+
+        assert restaurada.nome == ubs.nome
+        assert restaurada.endereco == ubs.endereco
+
+    def test_gestor_pode_desfazer(self, proxy_admin, proxy_gestor):
+        ubs = self._criar_e_atualizar(proxy_admin)
+
+        restaurada = proxy_gestor.desfazer_ultima_atualizacao_de_unidade()
+
+        assert restaurada.nome == ubs.nome
+
+    def test_medico_nao_pode_desfazer(self, proxy_admin, proxy_medico):
+        self._criar_e_atualizar(proxy_admin)
+
+        with pytest.raises(
+            AcessoNegado,
+            match="desfazer_ultima_atualizacao_de_unidade",
+        ):
+            proxy_medico.desfazer_ultima_atualizacao_de_unidade()
+
+    def test_perfil_negado_nao_consome_o_memento(
+        self,
+        proxy_admin,
+        proxy_medico,
+    ):
+        """A tentativa barrada não pode gastar o desfazer disponível."""
+        ubs = self._criar_e_atualizar(proxy_admin)
+
+        with pytest.raises(AcessoNegado):
+            proxy_medico.desfazer_ultima_atualizacao_de_unidade()
+
+        # O ADMINISTRADOR ainda consegue desfazer depois da tentativa negada.
+        restaurada = proxy_admin.desfazer_ultima_atualizacao_de_unidade()
+
+        assert restaurada.nome == ubs.nome
+
+
+# ---------------------------------------------------------------------------
 # Mensagem de AcessoNegado
 # ---------------------------------------------------------------------------
 

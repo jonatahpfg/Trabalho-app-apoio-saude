@@ -30,13 +30,14 @@ class ProxyGerenciadorDeUnidades:
 
     Matriz de permissões
     --------------------
-    Operação              | ADMINISTRADOR | GESTOR | MÉDICO
-    ----------------------|:---:|:---:|:---:
-    adicionar_unidade     |  ✅  |  ✅  |  ❌
-    listar_unidades       |  ✅  |  ✅  |  ✅
-    buscar_unidade_por_id |  ✅  |  ✅  |  ✅
-    atualizar_unidade     |  ✅  |  ✅  |  ❌
-    remover_unidade       |  ✅  |  ❌  |  ❌
+    Operação                              | ADMINISTRADOR | GESTOR | MÉDICO
+    --------------------------------------|:---:|:---:|:---:
+    adicionar_unidade                     |  ✅  |  ✅  |  ❌
+    listar_unidades                       |  ✅  |  ✅  |  ✅
+    buscar_unidade_por_id                 |  ✅  |  ✅  |  ✅
+    atualizar_unidade                     |  ✅  |  ✅  |  ❌
+    desfazer_ultima_atualizacao_de_unidade|  ✅  |  ✅  |  ❌
+    remover_unidade                       |  ✅  |  ❌  |  ❌
     """
 
     # Perfis autorizados por operação
@@ -126,6 +127,21 @@ class ProxyGerenciadorDeUnidades:
             cnpj=cnpj,
             endereco=endereco,
             telefone=telefone,
+        )
+
+    def desfazer_ultima_atualizacao_de_unidade(self) -> UnidadeBasicaSaude:
+        """Desfaz a última atualização de UBS — exige ADMINISTRADOR ou GESTOR.
+
+        Desfazer reescreve os dados da unidade, então exige os mesmos perfis
+        de ``atualizar_unidade``: é a operação que ela reverte.
+        """
+        self._verificar_perfil(
+            self._PERFIS_ATUALIZAR,
+            "desfazer_ultima_atualizacao_de_unidade",
+        )
+        return (
+            self._gerenciador
+            .desfazer_ultima_atualizacao_de_unidade()
         )
 
     def remover_unidade(self, unidade_id: int) -> UnidadeBasicaSaude:

@@ -129,6 +129,201 @@ class TestListarUsuarios:
 
 
 # ---------------------------------------------------------------------------
+# CRUD de usuário — busca, atualização e desativação
+# ---------------------------------------------------------------------------
+
+
+def _cadastrar_usuario(proxy_admin) -> Usuario:
+    """Cadastra um usuário pelo Proxy do ADMINISTRADOR."""
+    return proxy_admin.adicionar_usuario(
+        nome="João Silva",
+        cpf="12345678901",
+        email="joao@ubs.gov.br",
+        telefone="84999990000",
+        login="joao",
+        senha="SenhaForte1!",
+        perfil=Perfil.MEDICO,
+    )
+
+
+class TestBuscarUsuario:
+    def test_administrador_pode_buscar_por_id(self, proxy_admin):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        assert (
+            proxy_admin.buscar_usuario_por_id(cadastrado.id).login
+            == "joao"
+        )
+
+    def test_gestor_pode_buscar_por_id(self, proxy_admin, proxy_gestor):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        assert (
+            proxy_gestor.buscar_usuario_por_id(cadastrado.id).login
+            == "joao"
+        )
+
+    def test_medico_nao_pode_buscar_por_id(self, proxy_admin, proxy_medico):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        with pytest.raises(AcessoNegado, match="buscar_usuario_por_id"):
+            proxy_medico.buscar_usuario_por_id(cadastrado.id)
+
+    def test_administrador_pode_buscar_por_login(self, proxy_admin):
+        _cadastrar_usuario(proxy_admin)
+
+        assert (
+            proxy_admin.buscar_usuario_por_login("joao").login == "joao"
+        )
+
+    def test_gestor_pode_buscar_por_login(self, proxy_admin, proxy_gestor):
+        _cadastrar_usuario(proxy_admin)
+
+        assert (
+            proxy_gestor.buscar_usuario_por_login("joao").login == "joao"
+        )
+
+    def test_medico_nao_pode_buscar_por_login(self, proxy_admin, proxy_medico):
+        _cadastrar_usuario(proxy_admin)
+
+        with pytest.raises(AcessoNegado, match="buscar_usuario_por_login"):
+            proxy_medico.buscar_usuario_por_login("joao")
+
+
+class TestAtualizarUsuario:
+    def test_administrador_pode_atualizar(self, proxy_admin):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        atualizado = proxy_admin.atualizar_usuario(
+            usuario_id=cadastrado.id,
+            nome="João da Silva",
+            cpf=cadastrado.cpf,
+            email=cadastrado.email,
+            telefone=cadastrado.telefone,
+            login="joaosilva",
+            perfil=Perfil.GESTOR,
+        )
+
+        assert atualizado.login == "joaosilva"
+        assert atualizado.perfil is Perfil.GESTOR
+
+    def test_gestor_nao_pode_atualizar(self, proxy_admin, proxy_gestor):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        with pytest.raises(AcessoNegado, match="atualizar_usuario"):
+            proxy_gestor.atualizar_usuario(
+                usuario_id=cadastrado.id,
+                nome="João da Silva",
+                cpf=cadastrado.cpf,
+                email=cadastrado.email,
+                telefone=cadastrado.telefone,
+                login="joaosilva",
+                perfil=Perfil.GESTOR,
+            )
+
+    def test_medico_nao_pode_se_promover_a_administrador(
+        self,
+        proxy_admin,
+        proxy_medico,
+    ):
+        """A escalada de privilégio é barrada antes de alcançar o gerenciador."""
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        with pytest.raises(AcessoNegado, match="MEDICO"):
+            proxy_medico.atualizar_usuario(
+                usuario_id=cadastrado.id,
+                nome=cadastrado.nome,
+                cpf=cadastrado.cpf,
+                email=cadastrado.email,
+                telefone=cadastrado.telefone,
+                login=cadastrado.login,
+                perfil=Perfil.ADMINISTRADOR,
+            )
+
+        assert (
+            proxy_admin.buscar_usuario_por_id(cadastrado.id).perfil
+            is Perfil.MEDICO
+        )
+
+    def test_perfil_nao_autorizado_nao_redefine_senha(
+        self,
+        proxy_admin,
+        proxy_gestor,
+    ):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        with pytest.raises(AcessoNegado):
+            proxy_gestor.atualizar_usuario(
+                usuario_id=cadastrado.id,
+                nome=cadastrado.nome,
+                cpf=cadastrado.cpf,
+                email=cadastrado.email,
+                telefone=cadastrado.telefone,
+                login=cadastrado.login,
+                perfil=cadastrado.perfil,
+                senha="SenhaInvadida9$",
+            )
+
+        assert (
+            proxy_admin.buscar_usuario_por_id(cadastrado.id).senha_hash
+            == cadastrado.senha_hash
+        )
+
+
+class TestDesativarEReativarUsuario:
+    def test_administrador_pode_desativar(self, proxy_admin):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        assert (
+            proxy_admin.desativar_usuario(cadastrado.id).ativo is False
+        )
+
+    def test_administrador_pode_reativar(self, proxy_admin):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        proxy_admin.desativar_usuario(cadastrado.id)
+
+        assert proxy_admin.reativar_usuario(cadastrado.id).ativo is True
+
+    def test_gestor_nao_pode_desativar(self, proxy_admin, proxy_gestor):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        with pytest.raises(AcessoNegado, match="desativar_usuario"):
+            proxy_gestor.desativar_usuario(cadastrado.id)
+
+        assert (
+            proxy_admin.buscar_usuario_por_id(cadastrado.id).ativo is True
+        )
+
+    def test_medico_nao_pode_desativar(self, proxy_admin, proxy_medico):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        with pytest.raises(AcessoNegado, match="MEDICO"):
+            proxy_medico.desativar_usuario(cadastrado.id)
+
+    def test_gestor_nao_pode_reativar(self, proxy_admin, proxy_gestor):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        proxy_admin.desativar_usuario(cadastrado.id)
+
+        with pytest.raises(AcessoNegado, match="reativar_usuario"):
+            proxy_gestor.reativar_usuario(cadastrado.id)
+
+
+class TestListagemFiltrada:
+    def test_filtro_apenas_ativos_e_repassado_ao_gerenciador(
+        self,
+        proxy_admin,
+    ):
+        cadastrado = _cadastrar_usuario(proxy_admin)
+
+        proxy_admin.desativar_usuario(cadastrado.id)
+
+        assert len(proxy_admin.listar_usuarios()) == 1
+        assert proxy_admin.listar_usuarios(apenas_ativos=True) == []
+
+
+# ---------------------------------------------------------------------------
 # autenticar (operação pública — sem restrição de perfil)
 # ---------------------------------------------------------------------------
 

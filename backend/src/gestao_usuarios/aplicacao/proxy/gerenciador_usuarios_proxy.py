@@ -29,18 +29,29 @@ class ProxyGerenciadorDeUsuarios:
 
     Matriz de permissões
     --------------------
-    Operação              | ADMINISTRADOR | GESTOR | MÉDICO
-    ----------------------|:---:|:---:|:---:
-    adicionar_usuario     |  ✅  |  ❌  |  ❌
-    listar_usuarios       |  ✅  |  ✅  |  ❌
-    autenticar            |  ✅  |  ✅  |  ✅  (operação pública)
+    Operação                 | ADMINISTRADOR | GESTOR | MÉDICO
+    -------------------------|:---:|:---:|:---:
+    adicionar_usuario        |  ✅  |  ❌  |  ❌
+    listar_usuarios          |  ✅  |  ✅  |  ❌
+    buscar_usuario_por_id    |  ✅  |  ✅  |  ❌
+    buscar_usuario_por_login |  ✅  |  ✅  |  ❌
+    atualizar_usuario        |  ✅  |  ❌  |  ❌
+    desativar_usuario        |  ✅  |  ❌  |  ❌
+    reativar_usuario         |  ✅  |  ❌  |  ❌
+    autenticar               |  ✅  |  ✅  |  ✅  (operação pública)
+
+    O cadastro de usuário guarda dado pessoal, então a leitura fica restrita
+    aos perfis que já podiam listar, e toda escrita — incluir, alterar,
+    desativar e reativar — é privativa do ADMINISTRADOR.
     """
 
     # Perfis autorizados por operação
     _PERFIS_ADICIONAR: frozenset[Perfil] = frozenset({Perfil.ADMINISTRADOR})
-    _PERFIS_LISTAR: frozenset[Perfil] = frozenset(
+    _PERFIS_LEITURA: frozenset[Perfil] = frozenset(
         {Perfil.ADMINISTRADOR, Perfil.GESTOR}
     )
+    _PERFIS_ATUALIZAR: frozenset[Perfil] = frozenset({Perfil.ADMINISTRADOR})
+    _PERFIS_DESATIVAR: frozenset[Perfil] = frozenset({Perfil.ADMINISTRADOR})
 
     def __init__(
         self,
@@ -94,10 +105,81 @@ class ProxyGerenciadorDeUsuarios:
             perfil=perfil,
         )
 
-    def listar_usuarios(self) -> list[Usuario]:
+    def listar_usuarios(
+        self,
+        *,
+        apenas_ativos: bool = False,
+    ) -> list[Usuario]:
         """Lista usuários — exige perfil ADMINISTRADOR ou GESTOR."""
-        self._verificar_perfil(self._PERFIS_LISTAR, "listar_usuarios")
-        return self._gerenciador.listar_usuarios()
+        self._verificar_perfil(self._PERFIS_LEITURA, "listar_usuarios")
+        return self._gerenciador.listar_usuarios(
+            apenas_ativos=apenas_ativos
+        )
+
+    def buscar_usuario_por_id(self, usuario_id: int) -> Usuario:
+        """Busca um usuário pelo id — exige perfil ADMINISTRADOR ou GESTOR."""
+        self._verificar_perfil(
+            self._PERFIS_LEITURA,
+            "buscar_usuario_por_id",
+        )
+        return self._gerenciador.buscar_usuario_por_id(usuario_id)
+
+    def buscar_usuario_por_login(self, login: str) -> Usuario:
+        """Busca um usuário pelo login — exige perfil ADMINISTRADOR ou GESTOR."""
+        self._verificar_perfil(
+            self._PERFIS_LEITURA,
+            "buscar_usuario_por_login",
+        )
+        return self._gerenciador.buscar_usuario_por_login(login)
+
+    def atualizar_usuario(
+        self,
+        *,
+        usuario_id: int,
+        nome: str,
+        cpf: str,
+        email: str,
+        telefone: str,
+        login: str,
+        perfil: Perfil | str,
+        senha: str | None = None,
+    ) -> Usuario:
+        """Atualiza um usuário — exige perfil ADMINISTRADOR.
+
+        A alteração de perfil e a redefinição de senha passam por aqui, o que
+        torna esta a operação mais sensível do cadastro: um perfil não
+        autorizado poderia promover a si mesmo a ADMINISTRADOR.
+        """
+        self._verificar_perfil(
+            self._PERFIS_ATUALIZAR,
+            "atualizar_usuario",
+        )
+        return self._gerenciador.atualizar_usuario(
+            usuario_id=usuario_id,
+            nome=nome,
+            cpf=cpf,
+            email=email,
+            telefone=telefone,
+            login=login,
+            perfil=perfil,
+            senha=senha,
+        )
+
+    def desativar_usuario(self, usuario_id: int) -> Usuario:
+        """Desativa um usuário — exige perfil ADMINISTRADOR."""
+        self._verificar_perfil(
+            self._PERFIS_DESATIVAR,
+            "desativar_usuario",
+        )
+        return self._gerenciador.desativar_usuario(usuario_id)
+
+    def reativar_usuario(self, usuario_id: int) -> Usuario:
+        """Reativa um usuário — exige perfil ADMINISTRADOR."""
+        self._verificar_perfil(
+            self._PERFIS_DESATIVAR,
+            "reativar_usuario",
+        )
+        return self._gerenciador.reativar_usuario(usuario_id)
 
     def autenticar(self, *, login: str, senha: str) -> Usuario:
         """Autentica um usuário — operação pública, sem restrição de perfil."""
