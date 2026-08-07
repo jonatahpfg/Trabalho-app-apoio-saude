@@ -22,7 +22,6 @@ from ..portas.repositorio_registro_de_acesso import RepositorioRegistroDeAcesso
 from ..portas.repositorio_usuario import RepositorioUsuario
 
 if TYPE_CHECKING:
-    from .observer.evento import EventoDeAutenticacao
     from .observer.publicador import PublicadorDeEventosDeAutenticacao
 
 
