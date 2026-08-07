@@ -7,20 +7,22 @@ incluindo cadastro e autenticação de usuários, cadastro de Unidades Básicas 
 registro de acessos, geração de relatórios de estatísticas e restauração da última
 atualização de uma UBS.
 
-Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 6**, contemplando:
+Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 7**, contemplando:
 
 - autenticação por perfil;
-- CRUD de `Usuario`;
+- CRUD completo de `Usuario`, incluindo busca, atualização e desativação lógica;
 - CRUD de `UnidadeBasicaSaude`;
 - registro de acessos dos usuários;
 - relatórios de estatísticas de acesso;
 - separação entre negócio e persistência por Repository;
 - padrões Factory Method, Abstract Factory, Adapter, Template Method, Facade,
   Singleton, Command e Memento;
-- desfazer da última atualização bem-sucedida de uma Unidade Básica de Saúde.
+- desfazer da última atualização bem-sucedida de uma Unidade Básica de Saúde;
+- validação de login e de senha por meio de exceções de domínio;
+- persistência do CRUD de usuários nos dois mecanismos disponíveis (RAM e SQLite).
 
 > O **Paciente** e o módulo de triagem clínica aparecem no escopo geral do produto,
-> mas ainda não fazem parte deste contexto implementado no backend até a Sprint 6.
+> mas ainda não fazem parte deste contexto implementado no backend até a Sprint 7.
 
 ---
 
@@ -57,10 +59,10 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 6**, co
 | Campo | Descrição |
 | ----- | --------- |
 | Atores principais | Administrador, Gestor da Unidade |
-| Objetivo | Cadastrar e consultar usuários que operam o sistema. |
+| Objetivo | Cadastrar, consultar, atualizar e desativar os usuários que operam o sistema. |
 | Pré-condições | O ator deve estar autenticado e possuir perfil autorizado. |
-| Pós-condições | O usuário é cadastrado ou listado conforme as regras de domínio. |
-| Requisitos relacionados | RF02 — Gerenciar gestores e médicos; RF03 — Autenticar usuários; NF008 — Controle de acesso por perfil. |
+| Pós-condições | O usuário é cadastrado, listado, consultado, atualizado ou desativado conforme as regras de domínio. |
+| Requisitos relacionados | RF02 — Gerenciar gestores e médicos; RF03 — Autenticar usuários; NF008 — Controle de acesso por perfil; Sprint 2 — validação de campos com exceções. |
 
 **Fluxo principal**
 
@@ -72,14 +74,25 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 6**, co
 6. O sistema cria a entidade `Usuario`.
 7. A senha é armazenada somente na forma de hash.
 8. O sistema persiste o usuário por meio da porta `RepositorioUsuario`.
-9. O sistema permite listar os usuários cadastrados.
+9. O sistema permite listar os usuários cadastrados, opcionalmente apenas os ativos.
+10. O sistema permite buscar um usuário pelo identificador ou pelo login.
+11. O sistema permite atualizar os dados cadastrais de um usuário existente,
+    revalidando todas as regras antes de persistir.
+12. O sistema permite desativar logicamente um usuário, preservando o cadastro
+    e bloqueando o seu acesso.
 
 **Fluxos alternativos**
 
 - CPF já cadastrado: o sistema lança `CpfDuplicado`.
 - Login já cadastrado: o sistema lança `LoginDuplicado`.
 - Dados inválidos: o sistema lança `ErroDeValidacao`.
-- Falha de persistência: o sistema lança a exceção correspondente.
+- Usuário inexistente na busca, na atualização ou na desativação: o sistema lança
+  `UsuarioNaoEncontrado`.
+- Atualização inválida: nenhuma alteração é persistida e o cadastro permanece
+  como estava.
+- Autenticação de usuário desativado: o sistema lança `UsuarioInativo`.
+- Falha de persistência: o sistema lança a exceção correspondente
+  (`ErroDeAcessoAoBanco` ou `ErroDeAcessoAoArquivo`).
 
 ### UC03 — Gerenciar Unidades Básicas de Saúde
 
@@ -126,6 +139,7 @@ As principais regras atualmente implementadas são:
 
 - **RN01 — Login obrigatório:** todo usuário deve possuir login.
 - **RN02 — Tamanho do login:** o login deve possuir no máximo 12 caracteres.
+- **RN02.1 — Login sem números:** o login não pode conter dígitos (Sprint 2).
 - **RN03 — Login único:** dois usuários não podem possuir o mesmo login.
 - **RN04 — Autenticação:** a autenticação utiliza login e senha.
 - **RN05 — E-mail válido:** o e-mail cadastrado deve possuir formato válido.
@@ -142,6 +156,16 @@ As principais regras atualmente implementadas são:
   utilizado é descartado.
 - **RN13 — Estado completo da UBS:** o Memento preserva `id`, `nome`, `cnpj`,
   `endereco`, `telefone` e `ativa`.
+- **RN14 — Atualização revalidada:** a atualização de um usuário aplica exatamente
+  as mesmas validações da criação; uma atualização inválida não altera o cadastro.
+- **RN15 — Unicidade na atualização:** o CPF e o login continuam únicos na
+  atualização, desconsiderando o próprio usuário na comparação.
+- **RN16 — Exclusão lógica de usuário:** o usuário nunca é apagado; ele é marcado
+  como inativo e passa a ser recusado na autenticação com `UsuarioInativo`.
+- **RN17 — Senha na atualização:** a senha só é alterada quando informada, sempre
+  revalidada pela política de senhas e armazenada apenas como hash.
+- **RN18 — Paridade entre mecanismos:** o CRUD de usuários se comporta de forma
+  idêntica no armazenamento em RAM e em SQLite.
 
 ---
 
@@ -216,11 +240,11 @@ flowchart LR
 
 ---
 
-## 4. Diagrama de Classe de Análise até a Sprint 6
+## 4. Diagrama de Classe de Análise até a Sprint 7
 
-Este diagrama representa o estado atual do projeto até a Sprint 6. Ele contempla:
+Este diagrama representa o estado atual do projeto até a Sprint 7. Ele contempla:
 
-- CRUD de `Usuario`;
+- CRUD completo de `Usuario`, com busca, atualização e desativação lógica;
 - CRUD de `UnidadeBasicaSaude`;
 - entidade `RegistroDeAcesso`;
 - padrão **Repository** para separar negócio e persistência;
@@ -244,10 +268,15 @@ classDiagram
         +cpf: string
         +email: string
         +telefone: string
+        +login: string
         +senha_hash: string
         +perfil: Perfil
         +ativo: boolean
         +criar(dados) Usuario
+        +atualizar_dados(dados) Usuario
+        +alterar_senha(senha) Usuario
+        +desativar() Usuario
+        +ativar() Usuario
     }
 
     class Perfil {
@@ -302,8 +331,10 @@ classDiagram
         <<interface>>
         +salvar(usuario) Usuario
         +buscar_todos() List~Usuario~
+        +buscar_por_id(id) Usuario
         +buscar_por_cpf(cpf) Usuario
         +buscar_por_email(email) Usuario
+        +buscar_por_login(login) Usuario
     }
 
     class RepositorioUnidadeBasicaSaude {
@@ -331,7 +362,12 @@ classDiagram
         -repositorio: RepositorioUsuario
         -repositorio_acessos: RepositorioRegistroDeAcesso
         +adicionar_usuario(dados) Usuario
-        +listar_usuarios() List~Usuario~
+        +listar_usuarios(apenas_ativos) List~Usuario~
+        +buscar_usuario_por_id(id) Usuario
+        +buscar_usuario_por_login(login) Usuario
+        +atualizar_usuario(dados) Usuario
+        +desativar_usuario(id) Usuario
+        +reativar_usuario(id) Usuario
         +autenticar(login, senha) Usuario
     }
 
@@ -365,7 +401,12 @@ classDiagram
         -executor: ExecutorDeComandos
         +instancia() FacadeSingletonController
         +adicionar_usuario(dados) Usuario
-        +listar_usuarios() List~Usuario~
+        +listar_usuarios(apenas_ativos) List~Usuario~
+        +buscar_usuario_por_id(id) Usuario
+        +buscar_usuario_por_login(login) Usuario
+        +atualizar_usuario(dados) Usuario
+        +desativar_usuario(id) Usuario
+        +reativar_usuario(id) Usuario
         +autenticar(login, senha) Usuario
         +adicionar_unidade(dados) UnidadeBasicaSaude
         +listar_unidades() List~UnidadeBasicaSaude~
@@ -391,6 +432,11 @@ classDiagram
 
     class ComandoAdicionarUsuario
     class ComandoListarUsuarios
+    class ComandoBuscarUsuarioPorId
+    class ComandoBuscarUsuarioPorLogin
+    class ComandoAtualizarUsuario
+    class ComandoDesativarUsuario
+    class ComandoReativarUsuario
     class ComandoAutenticarUsuario
     class ComandoAdicionarUnidade
     class ComandoListarUnidades
@@ -402,6 +448,11 @@ classDiagram
 
     Comando <|.. ComandoAdicionarUsuario
     Comando <|.. ComandoListarUsuarios
+    Comando <|.. ComandoBuscarUsuarioPorId
+    Comando <|.. ComandoBuscarUsuarioPorLogin
+    Comando <|.. ComandoAtualizarUsuario
+    Comando <|.. ComandoDesativarUsuario
+    Comando <|.. ComandoReativarUsuario
     Comando <|.. ComandoAutenticarUsuario
     Comando <|.. ComandoAdicionarUnidade
     Comando <|.. ComandoListarUnidades
@@ -425,6 +476,11 @@ classDiagram
     ExecutorDeComandos --> Comando : executa
     ComandoAdicionarUsuario --> GerenciadorDeUsuarios : invoca
     ComandoListarUsuarios --> GerenciadorDeUsuarios : invoca
+    ComandoBuscarUsuarioPorId --> GerenciadorDeUsuarios : invoca
+    ComandoBuscarUsuarioPorLogin --> GerenciadorDeUsuarios : invoca
+    ComandoAtualizarUsuario --> GerenciadorDeUsuarios : invoca
+    ComandoDesativarUsuario --> GerenciadorDeUsuarios : invoca
+    ComandoReativarUsuario --> GerenciadorDeUsuarios : invoca
     ComandoAutenticarUsuario --> GerenciadorDeUsuarios : invoca
     ComandoAdicionarUnidade --> GerenciadorDeUnidades : invoca
     ComandoListarUnidades --> GerenciadorDeUnidades : invoca
@@ -650,20 +706,80 @@ duas atualizações consecutivas, um único desfazer restaura o estado correspon
 à primeira atualização, e uma nova tentativa de desfazer sem outra atualização
 gera `NenhumaAtualizacaoParaDesfazer`.
 
-O diagrama PlantUML específico desta evolução deve ser mantido em:
+Os participantes do Memento aparecem no diagrama de classes vigente:
 
-[`diagrama-classes-sprint6-memento.puml`](diagrama-classes-sprint6-memento.puml)
+[`diagrama-classes-sprint7-crud-usuarios.puml`](diagrama-classes-sprint7-crud-usuarios.puml)
 
 ---
 
-## 9. Rastreabilidade
+## 9. Sprint 7 — CRUD de Usuário e validações
+
+A Sprint 7 completa o CRUD de `Usuario` e consolida as validações de campo
+definidas no Laboratório 2 (Sprint 2), mantendo a arquitetura hexagonal e os
+padrões já adotados nas sprints anteriores.
+
+### Validação de login
+
+`ValidadorLogin` passa a aplicar as três regras do Laboratório 2:
+
+| Regra | Comportamento |
+| ----- | ------------- |
+| Obrigatório | `ErroDeValidacao` quando ausente, vazio ou só com espaços |
+| Máximo de 12 caracteres | `ErroDeValidacao` acima do limite |
+| Sem números | `ErroDeValidacao` quando qualquer dígito é encontrado |
+
+A senha permanece validada por `ValidadorSenha` conforme a política do AWS IAM:
+de 8 a 128 caracteres, ao menos três dos quatro grupos (maiúsculas, minúsculas,
+números e caracteres especiais) e diferente do nome e do e-mail do usuário.
+
+### Operações acrescentadas
+
+| Camada | Acréscimo |
+| ------ | --------- |
+| Domínio | `Usuario.atualizar_dados`, `Usuario.alterar_senha`, `Usuario.desativar`, `Usuario.ativar` e o erro `UsuarioNaoEncontrado` |
+| Portas | `RepositorioUsuario.buscar_por_id` |
+| Adaptadores | `buscar_por_id` em `RepositorioUsuarioEmMemoria` e em `RepositorioUsuarioBancoDeDados` |
+| Aplicação | `buscar_usuario_por_id`, `buscar_usuario_por_login`, `atualizar_usuario`, `desativar_usuario`, `reativar_usuario` e o filtro `apenas_ativos` na listagem |
+| Command | `ComandoBuscarUsuarioPorId`, `ComandoBuscarUsuarioPorLogin`, `ComandoAtualizarUsuario`, `ComandoDesativarUsuario` e `ComandoReativarUsuario` |
+| Facade | as mesmas operações expostas ao cliente, sempre via `ExecutorDeComandos` |
+
+As operações da entidade devolvem uma nova instância de `Usuario` em vez de
+alterar a existente, de modo que uma validação que falha nunca deixa o objeto
+em um estado intermediário inválido.
+
+### Exclusão lógica
+
+A remoção de usuário segue a mesma decisão já aplicada às Unidades Básicas de
+Saúde: o registro nunca é apagado. `desativar_usuario` apenas marca o usuário
+como inativo, o histórico de acessos é preservado e a autenticação passa a
+recusá-lo com `UsuarioInativo`. `reativar_usuario` desfaz a operação.
+
+A decisão está registrada em
+[ADR-004](adr/ADR-004-exclusao-logica-de-usuarios.md).
+
+### Paridade entre os dois mecanismos de persistência
+
+O CRUD é exercitado nos dois adaptadores exigidos pelo Laboratório 2. Os testes
+de `tests/test_crud_de_usuarios.py` são parametrizados e rodam cada cenário duas
+vezes — uma com `RepositorioUsuarioEmMemoria` (RAM) e outra com
+`RepositorioUsuarioBancoDeDados` (SQLite) — garantindo comportamento idêntico.
+As falhas de infraestrutura do SQLite continuam sendo traduzidas para
+`ErroDeAcessoAoBanco`, preservando o rastro da exceção original.
+
+O diagrama PlantUML correspondente está em:
+
+[`diagrama-classes-sprint7-crud-usuarios.puml`](diagrama-classes-sprint7-crud-usuarios.puml)
+
+---
+
+## 10. Rastreabilidade
 
 | Caso de uso / item técnico | Requisito / Laboratório | Entrega |
 | -------------------------- | ------------------------ | ------- |
 | Autenticar por Perfil | RF03 / NF008 | Sprint 2 / Sprint 4 |
 | Adicionar Usuário | RF02 | Sprint 1 / Sprint 2 |
 | Listar Usuários | RF02 | Sprint 1 |
-| Validar Login | Sprint 2 | Sprint 2 |
+| Validar Login | Sprint 2 | Sprint 2 / Sprint 7 |
 | Validar Senha com hash | Sprint 2 / NF007 | Sprint 2 / Sprint 4 |
 | Tratar Erros de Validação | Sprint 2 | Sprint 2 |
 | Persistência em Memória RAM | ADR-002 / Repository | Sprint 1 / Sprint 2 / Sprint 4 |
@@ -684,10 +800,16 @@ O diagrama PlantUML específico desta evolução deve ser mantido em:
 | Diagrama de casos de uso atualizado | Casos de uso até Sprint 6 | Sprint 6 |
 | Diagrama de classe de análise atualizado | Classe de análise até Sprint 6 | Sprint 6 |
 | Diagrama final de padrões | Padrões até Memento | Sprint 6 |
+| Buscar usuário por id e por login | RF02 / Sprint 2 | Sprint 7 |
+| Atualizar usuário | RF02 / Sprint 2 | Sprint 7 |
+| Desativar usuário (exclusão lógica) | RF02 / ADR-004 | Sprint 7 |
+| Login sem números | Sprint 2 (Laboratório 2) | Sprint 7 |
+| CRUD de usuário em RAM e em SQLite | Sprint 2 (dois mecanismos) | Sprint 7 |
+| `UsuarioNaoEncontrado` nas consultas | Sprint 2 (tratamento de erros) | Sprint 7 |
 
 ---
 
-## 10. Complemento — Casos de uso e diagrama de análise até Sprint 4
+## 11. Complemento — Casos de uso e diagrama de análise até Sprint 4
 
 A documentação complementar com a descrição dos três casos de uso mais relevantes,
 o diagrama de casos de uso atualizado e o diagrama de classe de análise referente
@@ -697,4 +819,4 @@ o diagrama de casos de uso atualizado e o diagrama de classe de análise referen
 
 > Este complemento permanece no repositório como registro histórico. A visão atual
 > do sistema está consolidada neste documento e no
-> `diagrama-classes-sprint6-memento.puml`.
+> `diagrama-classes-sprint7-crud-usuarios.puml`.

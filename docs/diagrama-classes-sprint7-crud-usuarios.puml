@@ -1,0 +1,473 @@
+@startuml
+title Diagrama de Classes — Sprint 7: CRUD de Usuário e Validações
+
+skinparam classAttributeIconSize 0
+
+' ============================================================
+' DOMÍNIO
+' ============================================================
+
+package "dominio" {
+
+    class Usuario <<Entity>> {
+        - id: int | None
+        - nome: str
+        - cpf: str
+        - email: str
+        - telefone: str
+        - login: str
+        - senha_hash: str
+        - perfil: Perfil
+        - ativo: bool
+        + criar(...): Usuario
+        + atualizar_dados(...): Usuario
+        + alterar_senha(senha: str): Usuario
+        + desativar(): Usuario
+        + ativar(): Usuario
+    }
+
+    class DadosCadastraisDeUsuario <<Value Object>> {
+        + nome: str
+        + cpf: str
+        + email: str
+        + telefone: str
+        + login: str
+        + perfil: Perfil
+    }
+
+    enum Perfil {
+        ADMINISTRADOR
+        GESTOR
+        MEDICO
+    }
+
+    class UnidadeBasicaSaude <<Entity>> <<Originator>> {
+        - id: int | None
+        - nome: str
+        - cnpj: str
+        - endereco: str
+        - telefone: str
+        - ativa: bool
+        + criar(...): UnidadeBasicaSaude
+        + criar_memento(): MementoUnidadeBasicaSaude
+        + restaurar(memento): void
+    }
+
+    class MementoUnidadeBasicaSaude <<Memento>> {
+        + id: int | None
+        + nome: str
+        + cnpj: str
+        + endereco: str
+        + telefone: str
+        + ativa: bool
+    }
+
+    class RegistroDeAcesso <<Entity>> {
+        - id: int | None
+        - login: str
+        - sucesso: bool
+        - data_hora: datetime
+        + criar(...): RegistroDeAcesso
+    }
+
+    class Senha <<Utility>> {
+        + {static} gerar_hash(senha: str): str
+        + {static} verificar(senha: str, senha_hash: str): bool
+    }
+
+    Usuario --> Perfil : possui
+    Usuario ..> Senha : gera hash
+    Usuario ..> DadosCadastraisDeUsuario : valida e normaliza
+    UnidadeBasicaSaude ..> MementoUnidadeBasicaSaude : cria/restaura
+}
+
+' ============================================================
+' ERROS DO DOMÍNIO
+' ============================================================
+
+package "dominio.erros" {
+
+    class ErroDeDominio <<Exception>>
+    class ErroDeValidacao <<Exception>>
+    class CpfDuplicado <<Exception>>
+    class LoginDuplicado <<Exception>>
+    class UsuarioNaoEncontrado <<Exception>>
+    class ErroDeAutenticacao <<Exception>>
+    class CredenciaisInvalidas <<Exception>>
+    class UsuarioInativo <<Exception>>
+    class ErroDePersistencia <<Exception>>
+    class ErroDeAcessoAoBanco <<Exception>>
+    class ErroDeAcessoAoArquivo <<Exception>>
+
+    ErroDeDominio <|-- ErroDeValidacao
+    ErroDeDominio <|-- CpfDuplicado
+    ErroDeDominio <|-- LoginDuplicado
+    ErroDeDominio <|-- UsuarioNaoEncontrado
+    ErroDeDominio <|-- ErroDeAutenticacao
+    ErroDeAutenticacao <|-- CredenciaisInvalidas
+    ErroDeAutenticacao <|-- UsuarioInativo
+    ErroDeDominio <|-- ErroDePersistencia
+    ErroDePersistencia <|-- ErroDeAcessoAoBanco
+    ErroDePersistencia <|-- ErroDeAcessoAoArquivo
+}
+
+' ============================================================
+' VALIDAÇÕES DO DOMÍNIO
+' ============================================================
+
+package "dominio.validacoes" {
+
+    class ValidadorTextoObrigatorio <<Validator>> {
+        + {static} validar(valor: str, campo: str): str
+    }
+
+    class ValidadorLogin <<Validator>> {
+        + {static} TAMANHO_MAXIMO_LOGIN: int = 12
+        + {static} validar(login: str): str
+    }
+
+    class ValidadorEmail <<Validator>> {
+        + {static} validar(email: str): str
+    }
+
+    class ValidadorSenha <<Validator>> {
+        + {static} validar(senha: str, nome: str, email: str): str
+    }
+
+    class ValidadorPerfil <<Validator>> {
+        + {static} validar(perfil, tipo_perfil)
+    }
+
+    ValidadorLogin ..> ValidadorTextoObrigatorio
+    ValidadorEmail ..> ValidadorTextoObrigatorio
+    ValidadorSenha ..> ValidadorTextoObrigatorio
+}
+
+note right of ValidadorLogin
+  Regras da Sprint 2:
+  obrigatório, no máximo 12
+  caracteres e sem números.
+end note
+
+note right of ValidadorSenha
+  Política AWS IAM:
+  8 a 128 caracteres, ao menos
+  3 dos 4 grupos e diferente
+  do nome e do e-mail.
+end note
+
+Usuario ..> ValidadorTextoObrigatorio : valida campos
+Usuario ..> ValidadorLogin : valida login
+Usuario ..> ValidadorEmail : valida e-mail
+Usuario ..> ValidadorSenha : valida senha
+Usuario ..> ValidadorPerfil : valida perfil
+
+' ============================================================
+' PORTAS (INTERFACES)
+' ============================================================
+
+package "portas" {
+
+    interface RepositorioUsuario <<Repository>> {
+        + salvar(usuario: Usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_id(id: int): Usuario | None
+        + buscar_por_cpf(cpf: str): Usuario | None
+        + buscar_por_email(email: str): Usuario | None
+        + buscar_por_login(login: str): Usuario | None
+    }
+
+    interface RepositorioUnidadeBasicaSaude <<Repository>> {
+        + salvar(unidade: UnidadeBasicaSaude): UnidadeBasicaSaude
+        + buscar_todas(): list<UnidadeBasicaSaude>
+        + buscar_por_id(id: int): UnidadeBasicaSaude | None
+        + buscar_por_cnpj(cnpj: str): UnidadeBasicaSaude | None
+    }
+
+    interface RepositorioRegistroDeAcesso <<Repository>> {
+        + salvar(registro: RegistroDeAcesso): RegistroDeAcesso
+        + buscar_todos(): list<RegistroDeAcesso>
+    }
+
+    interface FabricaRepositorio <<Abstract Factory>> {
+        + criar_repositorio_usuario(): RepositorioUsuario
+        + criar_repositorio_unidade_basica_saude(): RepositorioUnidadeBasicaSaude
+        + criar_repositorio_registro_de_acesso(): RepositorioRegistroDeAcesso
+    }
+}
+
+' ============================================================
+' ADAPTADORES — DOIS MECANISMOS DE PERSISTÊNCIA
+' ============================================================
+
+package "adaptadores" {
+
+    class RepositorioUsuarioEmMemoria <<Adapter>> {
+        - _usuarios: dict<int, Usuario>
+        + salvar(usuario: Usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_id(id: int): Usuario | None
+        + buscar_por_cpf(cpf: str): Usuario | None
+        + buscar_por_email(email: str): Usuario | None
+        + buscar_por_login(login: str): Usuario | None
+    }
+
+    class RepositorioUsuarioBancoDeDados <<Adapter>> {
+        - _conexao: sqlite3.Connection
+        + salvar(usuario: Usuario): Usuario
+        + buscar_todos(): list<Usuario>
+        + buscar_por_id(id: int): Usuario | None
+        + buscar_por_cpf(cpf: str): Usuario | None
+        + buscar_por_email(email: str): Usuario | None
+        + buscar_por_login(login: str): Usuario | None
+    }
+
+    class FabricaRepositorioEmMemoria <<Concrete Factory>>
+    class FabricaRepositorioBancoDeDados <<Concrete Factory>>
+
+    class SeletorFabrica <<Factory Method>> {
+        + obter_fabrica_repositorio(tipo: str): FabricaRepositorio
+    }
+
+    RepositorioUsuario <|.. RepositorioUsuarioEmMemoria
+    RepositorioUsuario <|.. RepositorioUsuarioBancoDeDados
+    FabricaRepositorio <|.. FabricaRepositorioEmMemoria
+    FabricaRepositorio <|.. FabricaRepositorioBancoDeDados
+    SeletorFabrica ..> FabricaRepositorio : resolve
+}
+
+RepositorioUsuarioBancoDeDados ..> ErroDeAcessoAoBanco : traduz sqlite3.Error
+
+' ============================================================
+' APLICAÇÃO — GERENCIADORES E FACHADA
+' ============================================================
+
+package "aplicacao" {
+
+    class GerenciadorDeUsuarios <<Control>> {
+        - repositorio: RepositorioUsuario
+        - repositorio_acessos: RepositorioRegistroDeAcesso
+        + adicionar_usuario(...): Usuario
+        + listar_usuarios(apenas_ativos: bool): list<Usuario>
+        + buscar_usuario_por_id(id: int): Usuario
+        + buscar_usuario_por_login(login: str): Usuario
+        + atualizar_usuario(...): Usuario
+        + desativar_usuario(id: int): Usuario
+        + reativar_usuario(id: int): Usuario
+        + autenticar(login: str, senha: str): Usuario
+        - _garantir_cpf_disponivel(usuario: Usuario): void
+        - _garantir_login_disponivel(usuario: Usuario): void
+    }
+
+    class GerenciadorDeUnidades <<Control>> {
+        - repositorio: RepositorioUnidadeBasicaSaude
+        - historico: HistoricoDeUnidade
+        + adicionar_unidade(...): UnidadeBasicaSaude
+        + listar_unidades(apenas_ativas: bool): list<UnidadeBasicaSaude>
+        + buscar_unidade_por_id(id: int): UnidadeBasicaSaude
+        + atualizar_unidade(...): UnidadeBasicaSaude
+        + desfazer_ultima_atualizacao_de_unidade(): UnidadeBasicaSaude
+        + remover_unidade(id: int): UnidadeBasicaSaude
+    }
+
+    class HistoricoDeUnidade <<Caretaker>> {
+        - _ultimo: MementoUnidadeBasicaSaude | None
+        + salvar(memento): void
+        + obter_ultimo(): MementoUnidadeBasicaSaude
+        + descartar_ultimo(): void
+        + possui_estado: bool
+    }
+
+    class FacadeSingletonController <<Facade>> <<Singleton>> {
+        - {static} _instancia_unica: FacadeSingletonController
+        - _gerenciador_usuarios: GerenciadorDeUsuarios
+        - _gerenciador_unidades: GerenciadorDeUnidades
+        - _executor: ExecutorDeComandos
+
+        + {static} instancia(): FacadeSingletonController
+        + {static} resetar_instancia(): void
+
+        + executar_comando(comando: Comando): Any
+        + adicionar_usuario(...): Usuario
+        + listar_usuarios(apenas_ativos: bool): list<Usuario>
+        + buscar_usuario_por_id(id: int): Usuario
+        + buscar_usuario_por_login(login: str): Usuario
+        + atualizar_usuario(...): Usuario
+        + desativar_usuario(id: int): Usuario
+        + reativar_usuario(id: int): Usuario
+        + autenticar(login: str, senha: str): Usuario
+
+        + adicionar_unidade(...): UnidadeBasicaSaude
+        + listar_unidades(apenas_ativas: bool): list<UnidadeBasicaSaude>
+        + buscar_unidade_por_id(id: int): UnidadeBasicaSaude
+        + atualizar_unidade(...): UnidadeBasicaSaude
+        + desfazer_ultima_atualizacao_de_unidade(): UnidadeBasicaSaude
+        + remover_unidade(id: int): UnidadeBasicaSaude
+
+        + obter_quantidade_total_entidades_cadastradas(): int
+    }
+
+    abstract class RelatorioDeAcessos <<Template Method>> {
+        + gerar(): str
+        # _calcular_estatisticas(registros): EstatisticasDeAcesso
+        # {abstract} _cabecalho(): str
+        # {abstract} _linha_por_login(estatistica): str
+        # {abstract} _rodape(estatisticas): str
+    }
+
+    class RelatorioDeAcessosTexto <<Concrete Template>>
+    class RelatorioDeAcessosCsv <<Concrete Template>>
+
+    RelatorioDeAcessos <|-- RelatorioDeAcessosTexto
+    RelatorioDeAcessos <|-- RelatorioDeAcessosCsv
+
+    GerenciadorDeUnidades --> HistoricoDeUnidade : mantém último estado
+    HistoricoDeUnidade --> MementoUnidadeBasicaSaude : guarda
+}
+
+' ============================================================
+' APLICAÇÃO — PADRÃO COMMAND
+' ============================================================
+
+package "aplicacao.comandos" {
+
+    interface Comando <<Command>> {
+        + {abstract} executar(): Any
+    }
+
+    class ExecutorDeComandos <<Invoker>> {
+        - _historico: list<Comando>
+        + executar(comando: Comando): Any
+        + historico: list<Comando>
+        + ultimo_comando: Comando | None
+        + limpar_historico(): void
+    }
+
+    class ComandoAdicionarUsuario <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        + executar(): Usuario
+    }
+
+    class ComandoListarUsuarios <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        - _apenas_ativos: bool
+        + executar(): list<Usuario>
+    }
+
+    class ComandoBuscarUsuarioPorId <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        - _usuario_id: int
+        + executar(): Usuario
+    }
+
+    class ComandoBuscarUsuarioPorLogin <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        - _login: str
+        + executar(): Usuario
+    }
+
+    class ComandoAtualizarUsuario <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        - _usuario_id: int
+        - _senha: str | None
+        + executar(): Usuario
+    }
+
+    class ComandoDesativarUsuario <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        - _usuario_id: int
+        + executar(): Usuario
+    }
+
+    class ComandoReativarUsuario <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        - _usuario_id: int
+        + executar(): Usuario
+    }
+
+    class ComandoAutenticarUsuario <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUsuarios
+        + executar(): Usuario
+    }
+
+    class ComandoAdicionarUnidade <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): UnidadeBasicaSaude
+    }
+
+    class ComandoListarUnidades <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): list<UnidadeBasicaSaude>
+    }
+
+    class ComandoBuscarUnidadePorId <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): UnidadeBasicaSaude
+    }
+
+    class ComandoAtualizarUnidade <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): UnidadeBasicaSaude
+    }
+
+    class ComandoDesfazerAtualizacaoDeUnidade <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): UnidadeBasicaSaude
+    }
+
+    class ComandoRemoverUnidade <<Concrete Command>> {
+        - _gerenciador: GerenciadorDeUnidades
+        + executar(): UnidadeBasicaSaude
+    }
+
+    class ComandoContarTotalEntidades <<Concrete Command>> {
+        - _gerenciador_usuarios: GerenciadorDeUsuarios
+        - _gerenciador_unidades: GerenciadorDeUnidades
+        + executar(): int
+    }
+
+    Comando <|.. ComandoAdicionarUsuario
+    Comando <|.. ComandoListarUsuarios
+    Comando <|.. ComandoBuscarUsuarioPorId
+    Comando <|.. ComandoBuscarUsuarioPorLogin
+    Comando <|.. ComandoAtualizarUsuario
+    Comando <|.. ComandoDesativarUsuario
+    Comando <|.. ComandoReativarUsuario
+    Comando <|.. ComandoAutenticarUsuario
+    Comando <|.. ComandoAdicionarUnidade
+    Comando <|.. ComandoListarUnidades
+    Comando <|.. ComandoBuscarUnidadePorId
+    Comando <|.. ComandoAtualizarUnidade
+    Comando <|.. ComandoDesfazerAtualizacaoDeUnidade
+    Comando <|.. ComandoRemoverUnidade
+    Comando <|.. ComandoContarTotalEntidades
+
+    ExecutorDeComandos o--> Comando : executa e guarda histórico
+}
+
+FacadeSingletonController --> ExecutorDeComandos : delega execução
+FacadeSingletonController ..> Comando : instancia
+
+ComandoAdicionarUsuario --> GerenciadorDeUsuarios : invoca
+ComandoListarUsuarios --> GerenciadorDeUsuarios : invoca
+ComandoBuscarUsuarioPorId --> GerenciadorDeUsuarios : invoca
+ComandoBuscarUsuarioPorLogin --> GerenciadorDeUsuarios : invoca
+ComandoAtualizarUsuario --> GerenciadorDeUsuarios : invoca
+ComandoDesativarUsuario --> GerenciadorDeUsuarios : invoca
+ComandoReativarUsuario --> GerenciadorDeUsuarios : invoca
+ComandoAutenticarUsuario --> GerenciadorDeUsuarios : invoca
+ComandoAdicionarUnidade --> GerenciadorDeUnidades : invoca
+ComandoListarUnidades --> GerenciadorDeUnidades : invoca
+ComandoBuscarUnidadePorId --> GerenciadorDeUnidades : invoca
+ComandoAtualizarUnidade --> GerenciadorDeUnidades : invoca
+ComandoDesfazerAtualizacaoDeUnidade --> GerenciadorDeUnidades : invoca
+ComandoRemoverUnidade --> GerenciadorDeUnidades : invoca
+ComandoContarTotalEntidades --> GerenciadorDeUsuarios : invoca
+ComandoContarTotalEntidades --> GerenciadorDeUnidades : invoca
+
+GerenciadorDeUsuarios ..> RepositorioUsuario : usa
+GerenciadorDeUsuarios ..> RepositorioRegistroDeAcesso : registra acesso
+GerenciadorDeUsuarios ..> UsuarioNaoEncontrado : lança
+GerenciadorDeUnidades ..> RepositorioUnidadeBasicaSaude : usa
+
+@enduml
