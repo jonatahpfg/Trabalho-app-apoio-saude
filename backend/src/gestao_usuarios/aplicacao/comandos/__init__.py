@@ -13,9 +13,14 @@ from .unidade import (
 )
 from .usuario import (
     ComandoAdicionarUsuario,
+    ComandoAtualizarUsuario,
     ComandoAutenticar,
     ComandoAutenticarUsuario,
+    ComandoBuscarUsuarioPorId,
+    ComandoBuscarUsuarioPorLogin,
+    ComandoDesativarUsuario,
     ComandoListarUsuarios,
+    ComandoReativarUsuario,
 )
 
 __all__ = [
@@ -23,13 +28,18 @@ __all__ = [
     "ComandoAdicionarUnidade",
     "ComandoAdicionarUsuario",
     "ComandoAtualizarUnidade",
+    "ComandoAtualizarUsuario",
     "ComandoAutenticar",
     "ComandoAutenticarUsuario",
     "ComandoBuscarUnidadePorId",
+    "ComandoBuscarUsuarioPorId",
+    "ComandoBuscarUsuarioPorLogin",
     "ComandoContarTotalEntidades",
+    "ComandoDesativarUsuario",
     "ComandoDesfazerAtualizacaoDeUnidade",
     "ComandoListarUnidades",
     "ComandoListarUsuarios",
+    "ComandoReativarUsuario",
     "ComandoRemoverUnidade",
     "ExecutorDeComandos",
 ]
