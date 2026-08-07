@@ -9,6 +9,17 @@ from gestao_usuarios.adaptadores.repositorio_usuario_banco_de_dados import (
 from gestao_usuarios.dominio.erros import ErroDeAcessoAoBanco
 from gestao_usuarios.dominio.usuario import Perfil, Usuario
 
+# O login não pode conter números (RN02), então o CPF é convertido
+# em letras para gerar um login único e válido em cada cenário.
+_DIGITO_PARA_LETRA = str.maketrans(
+    "0123456789",
+    "abcdefghij",
+)
+
+
+def _login_sem_numeros(cpf: str) -> str:
+    return f"u{cpf[-6:].translate(_DIGITO_PARA_LETRA)}"
+
 
 def _usuario(
     cpf: str = "12345678901",
@@ -19,7 +30,7 @@ def _usuario(
         cpf=cpf,
         email=f"{cpf}@ubs.gov.br",
         telefone="84999990000",
-        login=login or f"u{cpf[-10:]}",
+        login=login or _login_sem_numeros(cpf),
         senha="Senha123!",
         perfil=Perfil.MEDICO,
     )
@@ -63,7 +74,7 @@ def test_salvar_violacao_de_constraint_lanca_erro_de_banco():
     repositorio.salvar(
         _usuario(
             "11111111111",
-            login="usuario1",
+            login="usuarioum",
         )
     )
 
@@ -71,7 +82,7 @@ def test_salvar_violacao_de_constraint_lanca_erro_de_banco():
     # e lançar ErroDeAcessoAoBanco.
     u_duplicado = _usuario(
         "11111111111",
-        login="usuario2",
+        login="usuariodois",
     )
 
     with pytest.raises(ErroDeAcessoAoBanco):
@@ -103,13 +114,13 @@ def test_buscar_todos_devolve_usuarios_salvos():
     repositorio.salvar(
         _usuario(
             "11111111111",
-            login="usuario1",
+            login="usuarioum",
         )
     )
     repositorio.salvar(
         _usuario(
             "22222222222",
-            login="usuario2",
+            login="usuariodois",
         )
     )
 

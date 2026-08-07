@@ -85,7 +85,7 @@ def test_comando_adicionar_usuario_rejeita_cpf_duplicado(
         cpf="12345678901",
         email="outra@ubs.gov.br",
         telefone="84988887777",
-        login="ana2",
+        login="anasegunda",
         senha="OutraSenha2@",
         perfil=Perfil.GESTOR,
     )

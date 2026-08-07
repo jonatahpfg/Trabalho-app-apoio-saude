@@ -3,6 +3,17 @@ from gestao_usuarios.adaptadores.repositorio_usuario_em_memoria import (
 )
 from gestao_usuarios.dominio.usuario import Perfil, Usuario
 
+# O login não pode conter números (RN02), então o CPF é convertido
+# em letras para gerar um login único e válido em cada cenário.
+_DIGITO_PARA_LETRA = str.maketrans(
+    "0123456789",
+    "abcdefghij",
+)
+
+
+def _login_sem_numeros(cpf: str) -> str:
+    return f"u{cpf[-6:].translate(_DIGITO_PARA_LETRA)}"
+
 
 def _usuario(
     cpf: str = "12345678901",
@@ -13,7 +24,7 @@ def _usuario(
         cpf=cpf,
         email=f"{cpf}@ubs.gov.br",
         telefone="84999990000",
-        login=login or cpf,
+        login=login or _login_sem_numeros(cpf),
         senha="Senha123!",
         perfil=Perfil.MEDICO,
     )
@@ -25,14 +36,14 @@ def test_salvar_atribui_id_sequencial():
     primeiro = repositorio.salvar(
         _usuario(
             "11111111111",
-            "usuario1",
+            "usuarioum",
         )
     )
 
     segundo = repositorio.salvar(
         _usuario(
             "22222222222",
-            "usuario2",
+            "usuariodois",
         )
     )
 
@@ -46,14 +57,14 @@ def test_buscar_todos_retorna_usuarios_salvos():
     repositorio.salvar(
         _usuario(
             "11111111111",
-            "usuario1",
+            "usuarioum",
         )
     )
 
     repositorio.salvar(
         _usuario(
             "22222222222",
-            "usuario2",
+            "usuariodois",
         )
     )
 
@@ -74,7 +85,7 @@ def test_buscar_por_cpf_encontra_ou_devolve_none():
     repositorio.salvar(
         _usuario(
             "11111111111",
-            "usuario1",
+            "usuarioum",
         )
     )
 
@@ -99,7 +110,7 @@ def test_buscar_por_email_encontra_ou_devolve_none():
     repositorio.salvar(
         _usuario(
             "11111111111",
-            "usuario1",
+            "usuarioum",
         )
     )
 
@@ -124,16 +135,16 @@ def test_buscar_por_login_encontra_ou_devolve_none():
     repositorio.salvar(
         _usuario(
             "11111111111",
-            "usuario1",
+            "usuarioum",
         )
     )
 
     encontrado = repositorio.buscar_por_login(
-        "usuario1"
+        "usuarioum"
     )
 
     assert encontrado is not None
-    assert encontrado.login == "usuario1"
+    assert encontrado.login == "usuarioum"
 
     assert (
         repositorio.buscar_por_login(
@@ -149,7 +160,7 @@ def test_buscar_todos_nao_vaza_a_colecao_interna():
     repositorio.salvar(
         _usuario(
             "11111111111",
-            "usuario1",
+            "usuarioum",
         )
     )
 
