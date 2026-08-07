@@ -19,6 +19,7 @@ from .dominio.erros import (
     CpfDuplicado,
     CredenciaisInvalidas,
     ErroDeAutenticacao,
+    ErroDeDominio,
     ErroDePersistencia,
     LoginDuplicado,
 )
@@ -97,6 +98,61 @@ def main() -> None:
             f"[login={usuario.login}] "
             f"({usuario.perfil.value}) "
             f"— ativo={usuario.ativo}"
+        )
+
+    # 4. CRUD: buscar, atualizar e desativar.
+    # O mesmo roteiro vale para RAM e SQLite, pois o gerenciador só
+    # conhece a porta RepositorioUsuario.
+    print("\n--- Demonstração do CRUD de usuários ---")
+
+    try:
+        bruno = gerenciador.buscar_usuario_por_login("bruno")
+
+        print(
+            f"Buscado por login: #{bruno.id} {bruno.nome}"
+        )
+
+        atualizado = gerenciador.atualizar_usuario(
+            usuario_id=bruno.id,
+            nome="Bruno Lima da Silva",
+            cpf=bruno.cpf,
+            email="bruno.lima@ubs.gov.br",
+            telefone="84977776666",
+            login="brunolima",
+            perfil=Perfil.GESTOR,
+        )
+
+        print(
+            f"Atualizado: {atualizado.nome} "
+            f"[login={atualizado.login}] "
+            f"({atualizado.perfil.value})"
+        )
+
+        desativado = gerenciador.desativar_usuario(
+            atualizado.id
+        )
+
+        print(
+            f"Desativado: {desativado.nome} "
+            f"— ativo={desativado.ativo}"
+        )
+
+        print(
+            "Usuários ativos: "
+            + ", ".join(
+                usuario.login
+                for usuario in gerenciador.listar_usuarios(
+                    apenas_ativos=True
+                )
+            )
+        )
+
+    except ErroDeDominio as erro:
+        # ErroDeDominio é a raiz de todos os erros de negócio, inclusive
+        # das falhas de persistência — um único except cobre o roteiro.
+        print(
+            f"Erro no CRUD de usuários: {erro}",
+            file=sys.stderr,
         )
 
     print("\n--- Demonstração de autenticação ---")
