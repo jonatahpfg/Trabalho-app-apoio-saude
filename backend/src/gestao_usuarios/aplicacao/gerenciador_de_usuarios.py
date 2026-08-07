@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ..dominio.erros import (
     CpfDuplicado,
     CredenciaisInvalidas,
@@ -19,6 +21,10 @@ from ..dominio.validacoes.validador_texto_obrigatorio import (
 from ..portas.repositorio_registro_de_acesso import RepositorioRegistroDeAcesso
 from ..portas.repositorio_usuario import RepositorioUsuario
 
+if TYPE_CHECKING:
+    from .observer.evento import EventoDeAutenticacao
+    from .observer.publicador import PublicadorDeEventosDeAutenticacao
+
 
 class GerenciadorDeUsuarios:
     """Orquestra o CRUD e a autenticação de usuários."""
@@ -27,11 +33,14 @@ class GerenciadorDeUsuarios:
         self,
         repositorio: RepositorioUsuario,
         repositorio_acessos: RepositorioRegistroDeAcesso | None = None,
+        publicador: PublicadorDeEventosDeAutenticacao | None = None,
     ) -> None:
         self._repositorio = repositorio
         # Porta opcional: sem ela o gerenciador funciona normalmente,
         # apenas não gera estatísticas de acesso.
         self._repositorio_acessos = repositorio_acessos
+        # Observer opcional: sem ele o gerenciador não publica eventos.
+        self._publicador = publicador
 
     # --- Create ---
 
@@ -247,6 +256,7 @@ class GerenciadorDeUsuarios:
         # nunca é armazenada nem comparada diretamente.
         if usuario is None or not verificar(senha, usuario.senha_hash):
             self._registrar_acesso(login, sucesso=False)
+            self._publicar_evento(login, sucesso=False)
             raise CredenciaisInvalidas(
                 "Login ou senha incorretos."
             )
@@ -256,11 +266,13 @@ class GerenciadorDeUsuarios:
         # corretiva é diferente: reativar a conta, não redefinir a senha.
         if not usuario.ativo:
             self._registrar_acesso(login, sucesso=False)
+            self._publicar_evento(login, sucesso=False)
             raise UsuarioInativo(
                 f"A conta do usuário '{usuario.nome}' está desativada."
             )
 
         self._registrar_acesso(login, sucesso=True)
+        self._publicar_evento(login, sucesso=True)
         return usuario
 
     # --- Regras de unicidade ---
@@ -309,4 +321,20 @@ class GerenciadorDeUsuarios:
                 login=login,
                 sucesso=sucesso,
             )
+        )
+
+    def _publicar_evento(self, login: str, *, sucesso: bool) -> None:
+        """Publica um EventoDeAutenticacao para os observadores inscritos.
+
+        Padrão Observer (Sprint 6): o gerenciador notifica o publicador sem
+        conhecer os observadores concretos. A importação é local para evitar
+        dependência circular entre os subpacotes.
+        """
+        if self._publicador is None:
+            return
+
+        from .observer.evento import EventoDeAutenticacao  # noqa: PLC0415
+
+        self._publicador.notificar(
+            EventoDeAutenticacao(login=login, sucesso=sucesso)
         )

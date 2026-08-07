@@ -124,5 +124,23 @@ class CnpjDuplicado(ErroDeDominio):
 class UnidadeNaoEncontrada(ErroDeDominio):
     """Unidade Básica de Saúde não encontrada com o identificador informado."""
 
+
 class NenhumaAtualizacaoParaDesfazer(ErroDeDominio):
     """Não existe uma atualização de UBS disponível para ser desfeita."""
+
+
+# ---------------------------------------------------------------------------
+# Exceções de Autorização — subárvore AcessoNegado
+#
+# Lançadas pelo padrão Proxy quando o perfil do usuário autenticado não
+# possui permissão para executar a operação solicitada (Sprint 6).
+# ---------------------------------------------------------------------------
+
+
+class AcessoNegado(ErroDeDominio):
+    """Operação não permitida para o perfil do usuário autenticado.
+
+    Lançada pelo Proxy quando o perfil não consta na lista de perfis
+    autorizados para a operação. O nome revela claramente o problema
+    (Taborda: seja específico) sem expor detalhes de implementação.
+    """

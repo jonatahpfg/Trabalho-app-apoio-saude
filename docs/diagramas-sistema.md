@@ -16,7 +16,9 @@ Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 7**, co
 - relatórios de estatísticas de acesso;
 - separação entre negócio e persistência por Repository;
 - padrões Factory Method, Abstract Factory, Adapter, Template Method, Facade,
-  Singleton, Command e Memento;
+  Singleton, Command, Memento, Proxy e Observer;
+- autorização por perfil nas operações dos gerenciadores;
+- publicação de eventos de autenticação para log e estatísticas;
 - desfazer da última atualização bem-sucedida de uma Unidade Básica de Saúde;
 - validação de login e de senha por meio de exceções de domínio;
 - persistência do CRUD de usuários nos dois mecanismos disponíveis (RAM e SQLite).
@@ -712,7 +714,163 @@ Os participantes do Memento aparecem no diagrama de classes vigente:
 
 ---
 
-## 9. Sprint 7 — CRUD de Usuário e validações
+## 9. Sprint 6 — Padrões Proxy e Observer
+
+A Sprint 6 introduz dois novos padrões GoF na camada de aplicação:
+
+- **Proxy** — autorização por perfil antes de cada operação;
+- **Observer** — publicação/notificação de eventos de autenticação para log e estatísticas.
+
+---
+
+### Padrão Proxy — Autorização por Perfil
+
+*Classes participantes:* `ProxyGerenciadorDeUsuarios`, `ProxyGerenciadorDeUnidades`, `GerenciadorDeUsuarios` (RealSubject), `GerenciadorDeUnidades` (RealSubject), `AcessoNegado`.
+
+*Objetivo:* interpor uma camada de verificação de perfil entre o chamador e os gerenciadores reais. O cliente recebe um Proxy em vez do gerenciador direto; o Proxy verifica o perfil do usuário autenticado e, se autorizado, delega ao objeto real. Caso contrário, lança `AcessoNegado` sem nunca alcançar o gerenciador.
+
+#### Matriz de Permissões
+
+| Operação | ADMINISTRADOR | GESTOR | MÉDICO |
+|---|:---:|:---:|:---:|
+| `adicionar_usuario` | ✅ | ❌ | ❌ |
+| `listar_usuarios` | ✅ | ✅ | ❌ |
+| `autenticar` | ✅ | ✅ | ✅ |
+| `adicionar_unidade` | ✅ | ✅ | ❌ |
+| `listar_unidades` | ✅ | ✅ | ✅ |
+| `buscar_unidade_por_id` | ✅ | ✅ | ✅ |
+| `atualizar_unidade` | ✅ | ✅ | ❌ |
+| `remover_unidade` | ✅ | ❌ | ❌ |
+
+#### Diagrama de Classes — Proxy
+
+```mermaid
+classDiagram
+    class GerenciadorDeUsuarios {
+        <<RealSubject>>
+        +adicionar_usuario(dados) Usuario
+        +listar_usuarios() List~Usuario~
+        +autenticar(login, senha) Usuario
+    }
+
+    class ProxyGerenciadorDeUsuarios {
+        <<Proxy>>
+        -gerenciador: GerenciadorDeUsuarios
+        -usuario_autenticado: Usuario
+        +adicionar_usuario(dados) Usuario
+        +listar_usuarios() List~Usuario~
+        +autenticar(login, senha) Usuario
+        -_verificar_perfil(perfis, operacao)
+    }
+
+    class GerenciadorDeUnidades {
+        <<RealSubject>>
+        +adicionar_unidade(dados) UnidadeBasicaSaude
+        +listar_unidades() List~UnidadeBasicaSaude~
+        +buscar_unidade_por_id(id) UnidadeBasicaSaude
+        +atualizar_unidade(dados) UnidadeBasicaSaude
+        +remover_unidade(id) UnidadeBasicaSaude
+    }
+
+    class ProxyGerenciadorDeUnidades {
+        <<Proxy>>
+        -gerenciador: GerenciadorDeUnidades
+        -usuario_autenticado: Usuario
+        +adicionar_unidade(dados) UnidadeBasicaSaude
+        +listar_unidades() List~UnidadeBasicaSaude~
+        +buscar_unidade_por_id(id) UnidadeBasicaSaude
+        +atualizar_unidade(dados) UnidadeBasicaSaude
+        +remover_unidade(id) UnidadeBasicaSaude
+        -_verificar_perfil(perfis, operacao)
+    }
+
+    class AcessoNegado {
+        <<exception>>
+    }
+
+    ProxyGerenciadorDeUsuarios --> GerenciadorDeUsuarios : delega
+    ProxyGerenciadorDeUsuarios ..> AcessoNegado : lança
+    ProxyGerenciadorDeUnidades --> GerenciadorDeUnidades : delega
+    ProxyGerenciadorDeUnidades ..> AcessoNegado : lança
+    ProxyGerenciadorDeUsuarios --> Usuario : verifica perfil
+    ProxyGerenciadorDeUnidades --> Usuario : verifica perfil
+```
+
+---
+
+### Padrão Observer — Eventos de Autenticação
+
+*Classes participantes:* `PublicadorDeEventosDeAutenticacao` (Subject), `ObservadorDeAutenticacao` (Observer/ABC), `ObservadorDeLogDeAutenticacao`, `ObservadorDeEstatisticasDeAutenticacao` (Concrete Observers), `EventoDeAutenticacao` (objeto de dados).
+
+*Objetivo:* desacoplar o `GerenciadorDeUsuarios` dos seus interessados em eventos de autenticação. A cada tentativa de login (sucesso ou falha), o gerenciador publica um `EventoDeAutenticacao` no publicador; o publicador despacha o evento para todos os observadores inscritos sem que o gerenciador precise conhecê-los.
+
+#### Diagrama de Classes — Observer
+
+```mermaid
+classDiagram
+    class EventoDeAutenticacao {
+        <<dataclass>>
+        +login: str
+        +sucesso: bool
+        +data_hora: datetime
+    }
+
+    class ObservadorDeAutenticacao {
+        <<Observer>>
+        <<abstract>>
+        +atualizar(evento)*
+    }
+
+    class PublicadorDeEventosDeAutenticacao {
+        <<Subject>>
+        -observadores: List~ObservadorDeAutenticacao~
+        +assinar(observador)
+        +cancelar_assinatura(observador)
+        +notificar(evento)
+        +total_observadores: int
+    }
+
+    class ObservadorDeLogDeAutenticacao {
+        <<ConcreteObserver>>
+        -historico: List~EventoDeAutenticacao~
+        +atualizar(evento)
+        +historico: List~EventoDeAutenticacao~
+        +limpar()
+    }
+
+    class ObservadorDeEstatisticasDeAutenticacao {
+        <<ConcreteObserver>>
+        -total: int
+        -sucessos: int
+        -falhas: int
+        +atualizar(evento)
+        +total_tentativas: int
+        +total_sucessos: int
+        +total_falhas: int
+        +resumo() dict
+        +zerar()
+    }
+
+    class GerenciadorDeUsuarios {
+        <<Control>>
+        -publicador: PublicadorDeEventosDeAutenticacao
+        +autenticar(login, senha) Usuario
+        -_publicar_evento(login, sucesso)
+    }
+
+    ObservadorDeAutenticacao <|.. ObservadorDeLogDeAutenticacao
+    ObservadorDeAutenticacao <|.. ObservadorDeEstatisticasDeAutenticacao
+
+    PublicadorDeEventosDeAutenticacao --> ObservadorDeAutenticacao : notifica
+    PublicadorDeEventosDeAutenticacao ..> EventoDeAutenticacao : usa
+
+    GerenciadorDeUsuarios --> PublicadorDeEventosDeAutenticacao : publica em
+    GerenciadorDeUsuarios ..> EventoDeAutenticacao : cria
+```
+
+---
+
+## 10. Sprint 7 — CRUD de Usuário e validações
 
 A Sprint 7 completa o CRUD de `Usuario` e consolida as validações de campo
 definidas no Laboratório 2 (Sprint 2), mantendo a arquitetura hexagonal e os
@@ -772,7 +930,7 @@ O diagrama PlantUML correspondente está em:
 
 ---
 
-## 10. Rastreabilidade
+## 11. Rastreabilidade
 
 | Caso de uso / item técnico | Requisito / Laboratório | Entrega |
 | -------------------------- | ------------------------ | ------- |
@@ -806,10 +964,13 @@ O diagrama PlantUML correspondente está em:
 | Login sem números | Sprint 2 (Laboratório 2) | Sprint 7 |
 | CRUD de usuário em RAM e em SQLite | Sprint 2 (dois mecanismos) | Sprint 7 |
 | `UsuarioNaoEncontrado` nas consultas | Sprint 2 (tratamento de erros) | Sprint 7 |
+| Proxy — Autorização por Perfil | Sprint 6 (Proxy) | Sprint 6 |
+| Observer — Eventos de Autenticação | Sprint 6 (Observer) | Sprint 6 |
+| Matriz de Permissões | Sprint 6 (Proxy) | Sprint 6 |
 
 ---
 
-## 11. Complemento — Casos de uso e diagrama de análise até Sprint 4
+## 12. Complemento — Casos de uso e diagrama de análise até Sprint 4
 
 A documentação complementar com a descrição dos três casos de uso mais relevantes,
 o diagrama de casos de uso atualizado e o diagrama de classe de análise referente
