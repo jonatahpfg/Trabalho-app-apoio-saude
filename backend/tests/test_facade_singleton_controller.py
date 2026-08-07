@@ -16,6 +16,7 @@ from gestao_usuarios.dominio.erros import (
     CredenciaisInvalidas,
     ErroDeValidacao,
     LoginDuplicado,
+    NenhumaAtualizacaoParaDesfazer,
 )
 from gestao_usuarios.dominio.usuario import Perfil
 
@@ -399,10 +400,16 @@ class TestFacadeIntegracaoCommand:
             senha="SenhaSecreta1!",
             perfil=Perfil.ADMINISTRADOR,
         )
-        assert isinstance(facade.executor.ultimo_comando, ComandoAdicionarUsuario)
+        assert isinstance(
+            facade.executor.ultimo_comando,
+            ComandoAdicionarUsuario,
+        )
 
         facade.listar_usuarios()
-        assert isinstance(facade.executor.ultimo_comando, ComandoListarUsuarios)
+        assert isinstance(
+            facade.executor.ultimo_comando,
+            ComandoListarUsuarios,
+        )
 
         facade.adicionar_unidade(
             nome="UBS Central",
@@ -410,11 +417,18 @@ class TestFacadeIntegracaoCommand:
             endereco="Rua Central, 1",
             telefone="84999991111",
         )
-        assert isinstance(facade.executor.ultimo_comando, ComandoAdicionarUnidade)
+        assert isinstance(
+            facade.executor.ultimo_comando,
+            ComandoAdicionarUnidade,
+        )
 
         total = facade.obter_quantidade_total_entidades_cadastradas()
+
         assert total == 2
-        assert isinstance(facade.executor.ultimo_comando, ComandoContarTotalEntidades)
+        assert isinstance(
+            facade.executor.ultimo_comando,
+            ComandoContarTotalEntidades,
+        )
 
     def test_executar_comando_diretamente_pela_facade(self):
         facade = FacadeSingletonController.instancia()
@@ -435,10 +449,15 @@ class TestFacadeIntegracaoCommand:
         )
 
         usuario = facade.executar_comando(cmd_add)
+
         assert usuario.nome == "Bruno"
 
-        cmd_list = ComandoListarUsuarios(facade._gerenciador_usuarios)
+        cmd_list = ComandoListarUsuarios(
+            facade._gerenciador_usuarios
+        )
+
         usuarios = facade.executar_comando(cmd_list)
+
         assert len(usuarios) == 1
 
     def test_alias_facade_do_sistema(self):
@@ -446,4 +465,79 @@ class TestFacadeIntegracaoCommand:
             FacadeDoSistema,
         )
 
-        assert FacadeDoSistema is FacadeSingletonController
+        assert FacadeDoSistema is FacadeSingletonController
+
+
+# ------------------------------------------------------------------ #
+# Testes do padrão Memento na Facade                                 #
+# ------------------------------------------------------------------ #
+
+
+class TestFacadeMemento:
+    def test_deve_desfazer_ultima_atualizacao_de_unidade(self):
+        facade = FacadeSingletonController.instancia()
+
+        unidade = facade.adicionar_unidade(
+            nome="UBS Centro",
+            cnpj="12345678000199",
+            endereco="Rua Principal, 100",
+            telefone="84999990000",
+        )
+
+        facade.atualizar_unidade(
+            unidade_id=unidade.id,
+            nome="UBS Centro Atualizada",
+            cnpj="98765432000110",
+            endereco="Rua Nova, 200",
+            telefone="84988887777",
+        )
+
+        restaurada = (
+            facade.desfazer_ultima_atualizacao_de_unidade()
+        )
+
+        assert restaurada.id == unidade.id
+        assert restaurada.nome == "UBS Centro"
+        assert restaurada.cnpj == "12345678000199"
+        assert restaurada.endereco == "Rua Principal, 100"
+        assert restaurada.telefone == "84999990000"
+        assert restaurada.ativa is True
+
+        persistida = facade.buscar_unidade_por_id(unidade.id)
+
+        assert persistida == restaurada
+
+    def test_deve_rejeitar_desfazer_sem_atualizacao_anterior(self):
+        facade = FacadeSingletonController.instancia()
+
+        with pytest.raises(NenhumaAtualizacaoParaDesfazer):
+            facade.desfazer_ultima_atualizacao_de_unidade()
+
+    def test_desfazer_deve_ser_registrado_no_executor(self):
+        facade = FacadeSingletonController.instancia()
+
+        from gestao_usuarios.aplicacao.comandos import (
+            ComandoDesfazerAtualizacaoDeUnidade,
+        )
+
+        unidade = facade.adicionar_unidade(
+            nome="UBS Centro",
+            cnpj="12345678000199",
+            endereco="Rua Principal, 100",
+            telefone="84999990000",
+        )
+
+        facade.atualizar_unidade(
+            unidade_id=unidade.id,
+            nome="UBS Atualizada",
+            cnpj="98765432000110",
+            endereco="Rua Nova, 200",
+            telefone="84988887777",
+        )
+
+        facade.desfazer_ultima_atualizacao_de_unidade()
+
+        assert isinstance(
+            facade.executor.ultimo_comando,
+            ComandoDesfazerAtualizacaoDeUnidade,
+        )

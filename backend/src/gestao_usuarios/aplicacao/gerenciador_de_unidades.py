@@ -2,16 +2,27 @@
 
 from __future__ import annotations
 
-from ..dominio.erros import CnpjDuplicado, UnidadeNaoEncontrada
+from ..dominio.erros import (
+    CnpjDuplicado,
+    UnidadeNaoEncontrada,
+)
 from ..dominio.unidade_basica_saude import UnidadeBasicaSaude
-from ..portas.repositorio_unidade_basica_saude import RepositorioUnidadeBasicaSaude
+from ..portas.repositorio_unidade_basica_saude import (
+    RepositorioUnidadeBasicaSaude,
+)
+from .historico_de_unidade import HistoricoDeUnidade
 
 
 class GerenciadorDeUnidades:
-    """Orquestra o CRUD completo de Unidades Básicas de Saúde."""
+    """Orquestra o CRUD e o desfazer de Unidades Básicas de Saúde."""
 
-    def __init__(self, repositorio: RepositorioUnidadeBasicaSaude) -> None:
+    def __init__(
+        self,
+        repositorio: RepositorioUnidadeBasicaSaude,
+        historico: HistoricoDeUnidade | None = None,
+    ) -> None:
         self._repositorio = repositorio
+        self._historico = historico or HistoricoDeUnidade()
 
     # --- Create ---
 
@@ -30,30 +41,41 @@ class GerenciadorDeUnidades:
             endereco=endereco,
             telefone=telefone,
         )
+
         if self._repositorio.buscar_por_cnpj(unidade.cnpj) is not None:
             raise CnpjDuplicado(
                 f"Já existe uma unidade com o CNPJ {unidade.cnpj}"
             )
+
         return self._repositorio.salvar(unidade)
 
     # --- Read ---
 
     def listar_unidades(
-        self, *, apenas_ativas: bool = False
+        self,
+        *,
+        apenas_ativas: bool = False,
     ) -> list[UnidadeBasicaSaude]:
-        """Devolve todas as unidades cadastradas (opcionalmente só as ativas)."""
+        """Devolve todas as unidades, opcionalmente apenas as ativas."""
         todas = self._repositorio.buscar_todas()
+
         if apenas_ativas:
-            return [u for u in todas if u.ativa]
+            return [unidade for unidade in todas if unidade.ativa]
+
         return todas
 
-    def buscar_unidade_por_id(self, unidade_id: int) -> UnidadeBasicaSaude:
-        """Busca uma UBS pelo id ou lança ``UnidadeNaoEncontrada``."""
+    def buscar_unidade_por_id(
+        self,
+        unidade_id: int,
+    ) -> UnidadeBasicaSaude:
+        """Busca uma UBS pelo ID ou lança UnidadeNaoEncontrada."""
         unidade = self._repositorio.buscar_por_id(unidade_id)
+
         if unidade is None:
             raise UnidadeNaoEncontrada(
                 f"Unidade com id {unidade_id} não encontrada."
             )
+
         return unidade
 
     # --- Update ---
@@ -67,31 +89,89 @@ class GerenciadorDeUnidades:
         endereco: str,
         telefone: str,
     ) -> UnidadeBasicaSaude:
-        """Atualiza os dados de uma UBS existente."""
+        """Atualiza uma UBS e guarda seu estado anterior em um Memento."""
         existente = self.buscar_unidade_por_id(unidade_id)
 
+        # A criação valida todos os novos dados antes de guardar o Memento.
         atualizada = UnidadeBasicaSaude.criar(
             nome=nome,
             cnpj=cnpj,
             endereco=endereco,
             telefone=telefone,
         )
+
         atualizada.id = existente.id
         atualizada.ativa = existente.ativa
 
-        # Verifica duplicidade de CNPJ em outra unidade
-        por_cnpj = self._repositorio.buscar_por_cnpj(atualizada.cnpj)
-        if por_cnpj is not None and por_cnpj.id != atualizada.id:
+        # Impede que a UBS receba o CNPJ pertencente a outra unidade.
+        por_cnpj = self._repositorio.buscar_por_cnpj(
+            atualizada.cnpj
+        )
+
+        if (
+            por_cnpj is not None
+            and por_cnpj.id != atualizada.id
+        ):
             raise CnpjDuplicado(
-                f"Já existe outra unidade com o CNPJ {atualizada.cnpj}"
+                "Já existe outra unidade com o CNPJ "
+                f"{atualizada.cnpj}"
             )
 
-        return self._repositorio.salvar(atualizada)
+        # Captura o estado anterior, mas ainda não altera o histórico.
+        memento = existente.criar_memento()
 
-    # --- Delete (lógico) ---
+        # Primeiro confirma que a atualização foi persistida.
+        resultado = self._repositorio.salvar(atualizada)
 
-    def remover_unidade(self, unidade_id: int) -> UnidadeBasicaSaude:
-        """Desativa logicamente uma UBS (soft delete)."""
+        # Somente uma atualização bem-sucedida pode ser desfeita.
+        self._historico.salvar(memento)
+
+        return resultado
+
+    def desfazer_ultima_atualizacao_de_unidade(
+        self,
+    ) -> UnidadeBasicaSaude:
+        """Restaura a UBS alterada na última atualização bem-sucedida."""
+        memento = self._historico.obter_ultimo()
+
+        if memento.id is None:
+            raise UnidadeNaoEncontrada(
+                "O estado salvo não possui um ID de unidade."
+            )
+
+        unidade = self.buscar_unidade_por_id(memento.id)
+
+        # Verifica se o CNPJ antigo passou a pertencer a outra UBS.
+        por_cnpj = self._repositorio.buscar_por_cnpj(
+            memento.cnpj
+        )
+
+        if (
+            por_cnpj is not None
+            and por_cnpj.id != memento.id
+        ):
+            raise CnpjDuplicado(
+                "Não foi possível restaurar o CNPJ "
+                f"{memento.cnpj}, pois ele pertence a outra unidade."
+            )
+
+        unidade.restaurar(memento)
+
+        restaurada = self._repositorio.salvar(unidade)
+
+        # O desfazer só pode ser utilizado uma vez para essa atualização.
+        self._historico.descartar_ultimo()
+
+        return restaurada
+
+    # --- Delete lógico ---
+
+    def remover_unidade(
+        self,
+        unidade_id: int,
+    ) -> UnidadeBasicaSaude:
+        """Desativa logicamente uma UBS."""
         unidade = self.buscar_unidade_por_id(unidade_id)
         unidade.ativa = False
+
         return self._repositorio.salvar(unidade)

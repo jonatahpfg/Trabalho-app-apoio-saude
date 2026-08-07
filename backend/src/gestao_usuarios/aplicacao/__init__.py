@@ -9,6 +9,7 @@ from .comandos import (
     ComandoAutenticarUsuario,
     ComandoBuscarUnidadePorId,
     ComandoContarTotalEntidades,
+    ComandoDesfazerAtualizacaoDeUnidade,
     ComandoListarUnidades,
     ComandoListarUsuarios,
     ComandoRemoverUnidade,
@@ -20,6 +21,7 @@ from .facade_singleton_controller import (
 )
 from .gerenciador_de_unidades import GerenciadorDeUnidades
 from .gerenciador_de_usuarios import GerenciadorDeUsuarios
+from .historico_de_unidade import HistoricoDeUnidade
 from .relatorio_de_acessos import RelatorioDeAcessos
 from .relatorio_de_acessos_csv import RelatorioDeAcessosCsv
 from .relatorio_de_acessos_texto import RelatorioDeAcessosTexto
@@ -33,6 +35,7 @@ __all__ = [
     "ComandoAutenticarUsuario",
     "ComandoBuscarUnidadePorId",
     "ComandoContarTotalEntidades",
+    "ComandoDesfazerAtualizacaoDeUnidade",
     "ComandoListarUnidades",
     "ComandoListarUsuarios",
     "ComandoRemoverUnidade",
@@ -41,6 +44,7 @@ __all__ = [
     "FacadeSingletonController",
     "GerenciadorDeUnidades",
     "GerenciadorDeUsuarios",
+    "HistoricoDeUnidade",
     "RelatorioDeAcessos",
     "RelatorioDeAcessosCsv",
     "RelatorioDeAcessosTexto",

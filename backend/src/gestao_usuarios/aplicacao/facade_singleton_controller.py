@@ -11,8 +11,6 @@ import os
 from typing import TYPE_CHECKING, Any
 
 from ..adaptadores.seletor_fabrica import obter_fabrica_repositorio
-from ..aplicacao.gerenciador_de_unidades import GerenciadorDeUnidades
-from ..aplicacao.gerenciador_de_usuarios import GerenciadorDeUsuarios
 from ..dominio.unidade_basica_saude import UnidadeBasicaSaude
 from ..dominio.usuario import Perfil, Usuario
 from .comandos import (
@@ -23,33 +21,38 @@ from .comandos import (
     ComandoAutenticarUsuario,
     ComandoBuscarUnidadePorId,
     ComandoContarTotalEntidades,
+    ComandoDesfazerAtualizacaoDeUnidade,
     ComandoListarUnidades,
     ComandoListarUsuarios,
     ComandoRemoverUnidade,
     ExecutorDeComandos,
 )
+from .gerenciador_de_unidades import GerenciadorDeUnidades
+from .gerenciador_de_usuarios import GerenciadorDeUsuarios
 
 if TYPE_CHECKING:
-    from ..portas.repositorio_registro_de_acesso import RepositorioRegistroDeAcesso
-    from ..portas.repositorio_unidade_basica_saude import RepositorioUnidadeBasicaSaude
+    from ..portas.repositorio_registro_de_acesso import (
+        RepositorioRegistroDeAcesso,
+    )
+    from ..portas.repositorio_unidade_basica_saude import (
+        RepositorioUnidadeBasicaSaude,
+    )
     from ..portas.repositorio_usuario import RepositorioUsuario
 
 
 class FacadeSingletonController:
-    """Fachada (Facade) e instância única (Singleton) para gestão do sistema.
+    """Fachada e instância única para gestão do sistema.
 
-    Aplica o padrão **Facade** expondo uma interface simplificada que esconde
-    a montagem interna dos gerenciadores (GerenciadorDeUsuarios e
-    GerenciadorDeUnidades) e seus repositórios.
+    Aplica o padrão Facade expondo uma interface simplificada que
+    esconde os gerenciadores e seus repositórios.
 
-    Aplica o padrão **Singleton** garantindo uma única instância por processo,
-    criada na primeira chamada a ``instancia()``.
+    Aplica o padrão Singleton garantindo uma única instância por
+    processo, criada na primeira chamada a ``instancia()``.
 
-    Aplica o padrão **Command** convertendo cada requisição em um objeto de
-    comando e delegando sua execução ao ``ExecutorDeComandos``.
+    Aplica o padrão Command convertendo cada requisição em um objeto
+    de comando e delegando sua execução ao ``ExecutorDeComandos``.
     """
 
-    # atributo de classe que guarda a instância única (Singleton)
     _instancia_unica: FacadeSingletonController | None = None
 
     def __init__(
@@ -75,9 +78,14 @@ class FacadeSingletonController:
 
     @classmethod
     def instancia(cls) -> FacadeSingletonController:
-        """Ponto de acesso global à instância única (lazy initialization)."""
+        """Retorna a instância única da fachada."""
         if cls._instancia_unica is None:
-            repo_usuarios, repo_unidades, repo_acessos = cls._criar_repositorios()
+            (
+                repo_usuarios,
+                repo_unidades,
+                repo_acessos,
+            ) = cls._criar_repositorios()
+
             cls._instancia_unica = cls(
                 repo_usuarios,
                 repo_unidades,
@@ -94,30 +102,43 @@ class FacadeSingletonController:
         RepositorioUnidadeBasicaSaude,
         RepositorioRegistroDeAcesso,
     ]:
-        """Escolhe os repositórios utilizando a fábrica abstrata de persistência."""
-        tipo = os.environ.get("STORAGE_TYPE", "memoria").lower()
+        """Cria os repositórios usando a fábrica selecionada."""
+        tipo = os.environ.get(
+            "STORAGE_TYPE",
+            "memoria",
+        ).lower()
+
         fabrica = obter_fabrica_repositorio(tipo)
 
         repo_usuarios = fabrica.criar_repositorio_usuario()
-        repo_unidades = fabrica.criar_repositorio_unidade_basica_saude()
-        repo_acessos = fabrica.criar_repositorio_registro_de_acesso()
+        repo_unidades = (
+            fabrica.criar_repositorio_unidade_basica_saude()
+        )
+        repo_acessos = (
+            fabrica.criar_repositorio_registro_de_acesso()
+        )
 
-        return repo_usuarios, repo_unidades, repo_acessos
+        return (
+            repo_usuarios,
+            repo_unidades,
+            repo_acessos,
+        )
 
     @classmethod
     def resetar_instancia(cls) -> None:
-        """Reseta a instância única. Usado apenas nos testes."""
+        """Reseta a instância única para isolamento dos testes."""
         cls._instancia_unica = None
 
     # --- Execução genérica via Command ---
 
-    def executar_comando(self, comando: Comando) -> Any:
-        """Executa qualquer comando concreto diretamente pelo executor da fachada."""
+    def executar_comando(
+        self,
+        comando: Comando,
+    ) -> Any:
+        """Executa um comando concreto pelo executor da fachada."""
         return self._executor.executar(comando)
 
-    # --- Facade: interface simplificada para o subsistema via Comandos ---
-
-    # ---- Usuários ----
+    # --- Usuários ---
 
     def adicionar_usuario(
         self,
@@ -140,21 +161,31 @@ class FacadeSingletonController:
             senha=senha,
             perfil=perfil,
         )
+
         return self._executor.executar(comando)
 
     def listar_usuarios(self) -> list[Usuario]:
-        comando = ComandoListarUsuarios(self._gerenciador_usuarios)
+        comando = ComandoListarUsuarios(
+            self._gerenciador_usuarios
+        )
+
         return self._executor.executar(comando)
 
-    def autenticar(self, *, login: str, senha: str) -> Usuario:
+    def autenticar(
+        self,
+        *,
+        login: str,
+        senha: str,
+    ) -> Usuario:
         comando = ComandoAutenticarUsuario(
             self._gerenciador_usuarios,
             login=login,
             senha=senha,
         )
+
         return self._executor.executar(comando)
 
-    # ---- Unidades Básicas de Saúde ----
+    # --- Unidades Básicas de Saúde ---
 
     def adicionar_unidade(
         self,
@@ -171,6 +202,7 @@ class FacadeSingletonController:
             endereco=endereco,
             telefone=telefone,
         )
+
         return self._executor.executar(comando)
 
     def listar_unidades(
@@ -182,6 +214,7 @@ class FacadeSingletonController:
             self._gerenciador_unidades,
             apenas_ativas=apenas_ativas,
         )
+
         return self._executor.executar(comando)
 
     def buscar_unidade_por_id(
@@ -192,6 +225,7 @@ class FacadeSingletonController:
             self._gerenciador_unidades,
             unidade_id=unidade_id,
         )
+
         return self._executor.executar(comando)
 
     def atualizar_unidade(
@@ -211,6 +245,17 @@ class FacadeSingletonController:
             endereco=endereco,
             telefone=telefone,
         )
+
+        return self._executor.executar(comando)
+
+    def desfazer_ultima_atualizacao_de_unidade(
+        self,
+    ) -> UnidadeBasicaSaude:
+        """Desfaz a última atualização bem-sucedida de uma UBS."""
+        comando = ComandoDesfazerAtualizacaoDeUnidade(
+            self._gerenciador_unidades
+        )
+
         return self._executor.executar(comando)
 
     def remover_unidade(
@@ -221,21 +266,21 @@ class FacadeSingletonController:
             self._gerenciador_unidades,
             unidade_id=unidade_id,
         )
+
         return self._executor.executar(comando)
 
-    # ---- Método de contagem de entidades ----
+    # --- Contagem de entidades ---
 
-    def obter_quantidade_total_entidades_cadastradas(self) -> int:
-        """Retorna a quantidade total de entidades cadastradas no sistema.
-
-        Soma o total de usuários e de unidades básicas de saúde persistidos.
-        """
+    def obter_quantidade_total_entidades_cadastradas(
+        self,
+    ) -> int:
+        """Retorna a quantidade total de entidades cadastradas."""
         comando = ComandoContarTotalEntidades(
             self._gerenciador_usuarios,
             self._gerenciador_unidades,
         )
+
         return self._executor.executar(comando)
 
 
-# Alias semântico para a Fachada do Sistema
 FacadeDoSistema = FacadeSingletonController

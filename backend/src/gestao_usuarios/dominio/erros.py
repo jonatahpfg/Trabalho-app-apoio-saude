@@ -114,3 +114,6 @@ class CnpjDuplicado(ErroDeDominio):
 
 class UnidadeNaoEncontrada(ErroDeDominio):
     """Unidade Básica de Saúde não encontrada com o identificador informado."""
+
+class NenhumaAtualizacaoParaDesfazer(ErroDeDominio):
+    """Não existe uma atualização de UBS disponível para ser desfeita."""

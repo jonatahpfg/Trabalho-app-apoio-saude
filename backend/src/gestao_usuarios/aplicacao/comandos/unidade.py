@@ -162,3 +162,19 @@ class ComandoRemoverUnidade(Comando):
 
     def executar(self) -> UnidadeBasicaSaude:
         return self._gerenciador.remover_unidade(self._unidade_id)
+
+
+class ComandoDesfazerAtualizacaoDeUnidade(Comando):
+    """Comando para restaurar o estado anterior da última UBS atualizada."""
+
+    def __init__(
+        self,
+        gerenciador: GerenciadorDeUnidades,
+    ) -> None:
+        self._gerenciador = gerenciador
+
+    def executar(self) -> UnidadeBasicaSaude:
+        return (
+            self._gerenciador
+            .desfazer_ultima_atualizacao_de_unidade()
+        )
