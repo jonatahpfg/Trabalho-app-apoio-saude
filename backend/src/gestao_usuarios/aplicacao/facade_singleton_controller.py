@@ -18,12 +18,17 @@ from .comandos import (
     ComandoAdicionarUnidade,
     ComandoAdicionarUsuario,
     ComandoAtualizarUnidade,
+    ComandoAtualizarUsuario,
     ComandoAutenticarUsuario,
     ComandoBuscarUnidadePorId,
+    ComandoBuscarUsuarioPorId,
+    ComandoBuscarUsuarioPorLogin,
     ComandoContarTotalEntidades,
+    ComandoDesativarUsuario,
     ComandoDesfazerAtualizacaoDeUnidade,
     ComandoListarUnidades,
     ComandoListarUsuarios,
+    ComandoReativarUsuario,
     ComandoRemoverUnidade,
     ExecutorDeComandos,
 )
@@ -164,9 +169,86 @@ class FacadeSingletonController:
 
         return self._executor.executar(comando)
 
-    def listar_usuarios(self) -> list[Usuario]:
+    def listar_usuarios(
+        self,
+        *,
+        apenas_ativos: bool = False,
+    ) -> list[Usuario]:
         comando = ComandoListarUsuarios(
-            self._gerenciador_usuarios
+            self._gerenciador_usuarios,
+            apenas_ativos=apenas_ativos,
+        )
+
+        return self._executor.executar(comando)
+
+    def buscar_usuario_por_id(
+        self,
+        usuario_id: int,
+    ) -> Usuario:
+        comando = ComandoBuscarUsuarioPorId(
+            self._gerenciador_usuarios,
+            usuario_id=usuario_id,
+        )
+
+        return self._executor.executar(comando)
+
+    def buscar_usuario_por_login(
+        self,
+        login: str,
+    ) -> Usuario:
+        comando = ComandoBuscarUsuarioPorLogin(
+            self._gerenciador_usuarios,
+            login=login,
+        )
+
+        return self._executor.executar(comando)
+
+    def atualizar_usuario(
+        self,
+        *,
+        usuario_id: int,
+        nome: str,
+        cpf: str,
+        email: str,
+        telefone: str,
+        login: str,
+        perfil: Perfil | str,
+        senha: str | None = None,
+    ) -> Usuario:
+        comando = ComandoAtualizarUsuario(
+            self._gerenciador_usuarios,
+            usuario_id=usuario_id,
+            nome=nome,
+            cpf=cpf,
+            email=email,
+            telefone=telefone,
+            login=login,
+            perfil=perfil,
+            senha=senha,
+        )
+
+        return self._executor.executar(comando)
+
+    def desativar_usuario(
+        self,
+        usuario_id: int,
+    ) -> Usuario:
+        """Desativa logicamente um usuário, sem apagar o cadastro."""
+        comando = ComandoDesativarUsuario(
+            self._gerenciador_usuarios,
+            usuario_id=usuario_id,
+        )
+
+        return self._executor.executar(comando)
+
+    def reativar_usuario(
+        self,
+        usuario_id: int,
+    ) -> Usuario:
+        """Reativa um usuário previamente desativado."""
+        comando = ComandoReativarUsuario(
+            self._gerenciador_usuarios,
+            usuario_id=usuario_id,
         )
 
         return self._executor.executar(comando)

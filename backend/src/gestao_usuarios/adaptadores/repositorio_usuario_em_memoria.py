@@ -24,6 +24,10 @@ class RepositorioUsuarioEmMemoria:
     def buscar_todos(self) -> list[Usuario]:
         return [replace(usuario) for usuario in self._usuarios.values()]
 
+    def buscar_por_id(self, usuario_id: int) -> Usuario | None:
+        usuario = self._usuarios.get(usuario_id)
+        return replace(usuario) if usuario is not None else None
+
     def buscar_por_cpf(self, cpf: str) -> Usuario | None:
         for usuario in self._usuarios.values():
             if usuario.cpf == cpf:

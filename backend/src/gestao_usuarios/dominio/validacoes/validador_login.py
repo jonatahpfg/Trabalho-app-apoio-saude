@@ -17,10 +17,11 @@ class ValidadorLogin:
     def validar(login: str) -> str:
         """Devolve um login válido e normalizado.
 
-        Regras:
+        Regras (Laboratório 2 — tratamento de erros):
         - o login é obrigatório;
         - espaços nas extremidades são removidos;
-        - deve possuir no máximo 12 caracteres.
+        - deve possuir no máximo 12 caracteres;
+        - não pode conter números.
         """
         login = ValidadorTextoObrigatorio.validar(
             login,
@@ -31,6 +32,14 @@ class ValidadorLogin:
             raise ErroDeValidacao(
                 "O login deve possuir no máximo "
                 f"{TAMANHO_MAXIMO_LOGIN} caracteres."
+            )
+
+        if any(
+            caractere.isdigit()
+            for caractere in login
+        ):
+            raise ErroDeValidacao(
+                "O login não pode conter números."
             )
 
         return login

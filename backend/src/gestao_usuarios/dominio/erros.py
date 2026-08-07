@@ -34,6 +34,15 @@ class LoginDuplicado(ErroDeDominio):
     """Já existe um usuário cadastrado com o mesmo login."""
 
 
+class UsuarioNaoEncontrado(ErroDeDominio):
+    """Usuário não encontrado com o identificador informado.
+
+    Separada de CredenciaisInvalidas porque descreve uma consulta
+    administrativa que não localizou o registro, e não uma tentativa de
+    autenticação (Taborda: o nome da exceção revela o problema).
+    """
+
+
 # ---------------------------------------------------------------------------
 # Exceções de autenticação — subárvore ErroDeAutenticacao
 #

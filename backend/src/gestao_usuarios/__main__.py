@@ -33,6 +33,7 @@ from .dominio.erros import (
     CpfDuplicado,
     CredenciaisInvalidas,
     ErroDeAutenticacao,
+    ErroDeDominio,
     ErroDePersistencia,
     LoginDuplicado,
 )
@@ -137,6 +138,74 @@ def main() -> None:
             f"— ativo={usuario.ativo}"
         )
 
+    # 4. CRUD: buscar, atualizar e desativar.
+    # O mesmo roteiro vale para RAM e SQLite, pois o gerenciador só
+    # conhece a porta RepositorioUsuario.
+    #
+    # O roteiro usa um usuário próprio: as demonstrações seguintes de
+    # Proxy e Observer dependem dos perfis de Ana, Bruno e Carla.
+    print("\n--- Demonstração do CRUD de usuários ---")
+
+    try:
+        gerenciador.adicionar_usuario(
+            nome="Diego Rocha",
+            cpf="22233344455",
+            email="diego@ubs.gov.br",
+            telefone="84966665555",
+            login="diego",
+            senha="SenhaDiego4$",
+            perfil=Perfil.MEDICO,
+        )
+
+        diego = gerenciador.buscar_usuario_por_login("diego")
+
+        print(
+            f"Buscado por login: #{diego.id} {diego.nome}"
+        )
+
+        atualizado = gerenciador.atualizar_usuario(
+            usuario_id=diego.id,
+            nome="Diego Rocha Alves",
+            cpf=diego.cpf,
+            email="diego.alves@ubs.gov.br",
+            telefone="84955554444",
+            login="diegoalves",
+            perfil=Perfil.GESTOR,
+        )
+
+        print(
+            f"Atualizado: {atualizado.nome} "
+            f"[login={atualizado.login}] "
+            f"({atualizado.perfil.value})"
+        )
+
+        desativado = gerenciador.desativar_usuario(
+            atualizado.id
+        )
+
+        print(
+            f"Desativado: {desativado.nome} "
+            f"— ativo={desativado.ativo}"
+        )
+
+        print(
+            "Usuários ativos: "
+            + ", ".join(
+                usuario.login
+                for usuario in gerenciador.listar_usuarios(
+                    apenas_ativos=True
+                )
+            )
+        )
+
+    except ErroDeDominio as erro:
+        # ErroDeDominio é a raiz de todos os erros de negócio, inclusive
+        # das falhas de persistência — um único except cobre o roteiro.
+        print(
+            f"Erro no CRUD de usuários: {erro}",
+            file=sys.stderr,
+        )
+
     print("\n--- Demonstração de autenticação ---")
 
     # Cenário 1: login e senha corretos → Observer notificado (sucesso).
@@ -197,7 +266,8 @@ def main() -> None:
     proxy_admin_ubs = ProxyGerenciadorDeUnidades(gerenciador_unidades, admin)
 
     # Proxy para o usuário MÉDICO
-    medico = gerenciador.listar_usuarios()[1]   # Bruno Lima (MEDICO)
+    # A busca por login não depende da ordem da listagem.
+    medico = gerenciador.buscar_usuario_por_login("bruno")
     proxy_medico_usr = ProxyGerenciadorDeUsuarios(gerenciador, medico)
     proxy_medico_ubs = ProxyGerenciadorDeUnidades(gerenciador_unidades, medico)
 

@@ -1,6 +1,7 @@
 import pytest
 
 from gestao_usuarios.dominio.erros import ErroDeValidacao
+from gestao_usuarios.dominio.senha import verificar
 from gestao_usuarios.dominio.usuario import Perfil, Usuario
 
 
@@ -257,3 +258,119 @@ def test_cria_usuario_quando_senha_atende_tres_de_quatro_requisitos():
     )
 
     assert usuario.nome == "Ana"
+
+def _usuario_valido() -> Usuario:
+    return Usuario.criar(
+        nome="Ana",
+        cpf="12345678901",
+        email="ana@ubs.gov.br",
+        telefone="84999990000",
+        login="ana",
+        senha="Senha123!",
+        perfil=Perfil.MEDICO,
+    )
+
+
+def test_atualizar_dados_devolve_usuario_com_novos_dados():
+    usuario = _usuario_valido()
+    usuario.id = 7
+
+    atualizado = usuario.atualizar_dados(
+        nome="Ana Souza",
+        cpf="98765432100",
+        email="ana.souza@ubs.gov.br",
+        telefone="84988887777",
+        login="anasouza",
+        perfil=Perfil.GESTOR,
+    )
+
+    assert atualizado.nome == "Ana Souza"
+    assert atualizado.cpf == "98765432100"
+    assert atualizado.email == "ana.souza@ubs.gov.br"
+    assert atualizado.telefone == "84988887777"
+    assert atualizado.login == "anasouza"
+    assert atualizado.perfil is Perfil.GESTOR
+
+
+def test_atualizar_dados_preserva_id_senha_e_ativacao():
+    usuario = _usuario_valido()
+    usuario.id = 7
+
+    atualizado = usuario.atualizar_dados(
+        nome="Ana Souza",
+        cpf="12345678901",
+        email="ana@ubs.gov.br",
+        telefone="84999990000",
+        login="ana",
+        perfil=Perfil.MEDICO,
+    )
+
+    assert atualizado.id == 7
+    assert atualizado.senha_hash == usuario.senha_hash
+    assert atualizado.ativo is True
+
+
+def test_atualizar_dados_nao_altera_a_instancia_original():
+    usuario = _usuario_valido()
+
+    usuario.atualizar_dados(
+        nome="Ana Souza",
+        cpf="98765432100",
+        email="ana.souza@ubs.gov.br",
+        telefone="84988887777",
+        login="anasouza",
+        perfil=Perfil.GESTOR,
+    )
+
+    assert usuario.nome == "Ana"
+    assert usuario.login == "ana"
+
+
+def test_atualizar_dados_aplica_as_mesmas_validacoes_da_criacao():
+    usuario = _usuario_valido()
+
+    with pytest.raises(
+        ErroDeValidacao,
+        match="não pode conter números",
+    ):
+        usuario.atualizar_dados(
+            nome="Ana",
+            cpf="12345678901",
+            email="ana@ubs.gov.br",
+            telefone="84999990000",
+            login="ana2",
+            perfil=Perfil.MEDICO,
+        )
+
+
+def test_alterar_senha_gera_novo_hash():
+    usuario = _usuario_valido()
+
+    atualizado = usuario.alterar_senha("NovaSenha456@")
+
+    assert atualizado.senha_hash != usuario.senha_hash
+    assert verificar("NovaSenha456@", atualizado.senha_hash)
+
+
+def test_alterar_senha_rejeita_senha_fora_da_politica():
+    usuario = _usuario_valido()
+
+    with pytest.raises(ErroDeValidacao):
+        usuario.alterar_senha("curta")
+
+
+def test_desativar_marca_o_usuario_como_inativo():
+    usuario = _usuario_valido()
+
+    desativado = usuario.desativar()
+
+    assert desativado.ativo is False
+    assert usuario.ativo is True
+
+
+def test_ativar_marca_o_usuario_como_ativo():
+    usuario = _usuario_valido().desativar()
+
+    reativado = usuario.ativar()
+
+    assert reativado.ativo is True

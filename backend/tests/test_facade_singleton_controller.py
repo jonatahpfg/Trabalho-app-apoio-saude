@@ -8,6 +8,10 @@ Verificam:
 
 import pytest
 
+from gestao_usuarios.aplicacao.comandos import (
+    ComandoBuscarUsuarioPorId,
+    ComandoDesativarUsuario,
+)
 from gestao_usuarios.aplicacao.facade_singleton_controller import (
     FacadeSingletonController,
 )
@@ -17,6 +21,8 @@ from gestao_usuarios.dominio.erros import (
     ErroDeValidacao,
     LoginDuplicado,
     NenhumaAtualizacaoParaDesfazer,
+    UsuarioInativo,
+    UsuarioNaoEncontrado,
 )
 from gestao_usuarios.dominio.usuario import Perfil
 
@@ -540,4 +546,142 @@ class TestFacadeMemento:
         assert isinstance(
             facade.executor.ultimo_comando,
             ComandoDesfazerAtualizacaoDeUnidade,
+        )
+
+# ------------------------------------------------------------------ #
+# Testes do padrão Facade — CRUD de usuários                          #
+# ------------------------------------------------------------------ #
+
+
+class TestFacadeCrudDeUsuarios:
+    @pytest.fixture
+    def facade_com_usuario(self):
+        facade = FacadeSingletonController.instancia()
+
+        usuario = facade.adicionar_usuario(
+            nome="Ana Souza",
+            cpf="12345678901",
+            email="ana@ubs.gov.br",
+            telefone="84999990000",
+            login="ana",
+            senha="SenhaSecreta1!",
+            perfil=Perfil.ADMINISTRADOR,
+        )
+
+        return facade, usuario
+
+    def test_busca_usuario_por_id(self, facade_com_usuario):
+        facade, usuario = facade_com_usuario
+
+        encontrado = facade.buscar_usuario_por_id(usuario.id)
+
+        assert encontrado.id == usuario.id
+        assert encontrado.nome == "Ana Souza"
+
+    def test_busca_usuario_por_login(self, facade_com_usuario):
+        facade, usuario = facade_com_usuario
+
+        encontrado = facade.buscar_usuario_por_login("ana")
+
+        assert encontrado.id == usuario.id
+
+    def test_rejeita_busca_de_usuario_inexistente(self):
+        facade = FacadeSingletonController.instancia()
+
+        with pytest.raises(UsuarioNaoEncontrado):
+            facade.buscar_usuario_por_id(999)
+
+    def test_atualiza_usuario(self, facade_com_usuario):
+        facade, usuario = facade_com_usuario
+
+        atualizado = facade.atualizar_usuario(
+            usuario_id=usuario.id,
+            nome="Ana Maria",
+            cpf="98765432100",
+            email="ana.maria@ubs.gov.br",
+            telefone="84988887777",
+            login="anamaria",
+            perfil=Perfil.GESTOR,
+        )
+
+        assert atualizado.id == usuario.id
+        assert atualizado.nome == "Ana Maria"
+        assert atualizado.login == "anamaria"
+        assert atualizado.perfil is Perfil.GESTOR
+
+        assert (
+            facade.buscar_usuario_por_id(usuario.id).nome
+            == "Ana Maria"
+        )
+
+    def test_rejeita_atualizacao_com_login_invalido(
+        self,
+        facade_com_usuario,
+    ):
+        facade, usuario = facade_com_usuario
+
+        with pytest.raises(ErroDeValidacao):
+            facade.atualizar_usuario(
+                usuario_id=usuario.id,
+                nome=usuario.nome,
+                cpf=usuario.cpf,
+                email=usuario.email,
+                telefone=usuario.telefone,
+                login="ana2",
+                perfil=usuario.perfil,
+            )
+
+    def test_desativa_usuario_e_bloqueia_a_autenticacao(
+        self,
+        facade_com_usuario,
+    ):
+        facade, usuario = facade_com_usuario
+
+        desativado = facade.desativar_usuario(usuario.id)
+
+        assert desativado.ativo is False
+        assert len(facade.listar_usuarios()) == 1
+        assert (
+            facade.listar_usuarios(apenas_ativos=True) == []
+        )
+
+        with pytest.raises(UsuarioInativo):
+            facade.autenticar(
+                login="ana",
+                senha="SenhaSecreta1!",
+            )
+
+    def test_reativa_usuario_desativado(
+        self,
+        facade_com_usuario,
+    ):
+        facade, usuario = facade_com_usuario
+
+        facade.desativar_usuario(usuario.id)
+        reativado = facade.reativar_usuario(usuario.id)
+
+        assert reativado.ativo is True
+        assert facade.autenticar(
+            login="ana",
+            senha="SenhaSecreta1!",
+        )
+
+    def test_operacoes_de_crud_passam_pelo_executor_de_comandos(
+        self,
+        facade_com_usuario,
+    ):
+        facade, usuario = facade_com_usuario
+
+        facade.buscar_usuario_por_id(usuario.id)
+
+        assert isinstance(
+            facade.executor.ultimo_comando,
+            ComandoBuscarUsuarioPorId,
+        )
+
+        facade.desativar_usuario(usuario.id)
+
+        assert isinstance(
+            facade.executor.ultimo_comando,
+            ComandoDesativarUsuario,
         )

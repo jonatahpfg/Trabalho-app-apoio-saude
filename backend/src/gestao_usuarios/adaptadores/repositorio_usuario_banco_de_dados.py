@@ -131,6 +131,10 @@ class RepositorioUsuarioBancoDeDados:
                 "Erro ao listar usuários.", e
             ) from e
 
+    def buscar_por_id(self, usuario_id: int) -> Usuario | None:
+        """Devolve o usuário com o id informado, ou ``None`` se não existir."""
+        return self._buscar_por_campo("id", usuario_id)
+
     def buscar_por_cpf(self, cpf: str) -> Usuario | None:
         """Devolve o usuário com o CPF informado, ou ``None`` se não existir."""
         return self._buscar_por_campo("cpf", cpf)
@@ -146,8 +150,11 @@ class RepositorioUsuarioBancoDeDados:
     def _buscar_por_campo(
         self,
         campo: str,
-        valor: str,
+        valor: object,
     ) -> Usuario | None:
+        # ``campo`` nunca vem do usuário final: é sempre uma constante
+        # definida nos métodos públicos acima. O valor consultado segue
+        # parametrizado, protegendo a consulta contra SQL injection.
         try:
             with self._obter_conexao() as conn:
                 linha = conn.execute(

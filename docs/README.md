@@ -6,7 +6,7 @@ arquiteturais do App Experimental de Apoio à Triagem Médica.
 ## Documentação atual
 
 - [Diagramas e visão atual do sistema](diagramas-sistema.md)
-- [Diagrama de classes — Sprint 6 (Memento)](diagrama-classes-sprint6-memento.puml)
+- [Diagrama de classes — Sprint 7 (CRUD de Usuário)](diagrama-classes-sprint7-crud-usuarios.puml)
 - [Diagrama de classes — Sprint 5 (Command)](diagrama-classes-sprint5-command.puml)
 - [Documento de Requisitos](documento-de-requisitos.docx)
 - [Registros de Decisões Arquiteturais](adr/README.md)
@@ -15,8 +15,9 @@ arquiteturais do App Experimental de Apoio à Triagem Médica.
 
 ### Estado atual
 
-- `diagrama-classes-sprint6-memento.puml` — diagrama correspondente ao estado
-  atual do backend com a integração do **Padrão Memento**;
+- `diagrama-classes-sprint7-crud-usuarios.puml` — diagrama correspondente ao
+  estado atual do backend, com o CRUD completo de `Usuario`, as validações do
+  Laboratório 2 e os padrões já integrados até o **Memento**;
 - `diagramas-sistema.md` — visão consolidada da arquitetura e dos padrões
   implementados no sistema;
 - `diagrama-classes.puml` — diagrama oficial inicial do backend.
@@ -28,9 +29,7 @@ arquiteturais do App Experimental de Apoio à Triagem Médica.
 - `diagrama-classes-final-sprint4.puml` — diagrama consolidado da
   Sprint 4, revisado após o feedback da avaliação;
 - `diagrama-classes-sprint5-command.puml` — diagrama com o padrão
-  Command da Sprint 5;
-- `diagrama-classes-sprint6-memento.puml` — diagrama com o padrão
-  Memento aplicado ao desfazer da última atualização de uma UBS.
+  Command da Sprint 5.
 
 Os diagramas são mantidos no repositório para demonstrar a evolução
 da arquitetura e da implementação ao longo das Sprints.
@@ -42,7 +41,7 @@ da arquitetura e da implementação ao longo das Sprints.
 O complemento da Sprint 4 representa o contexto daquela entrega.
 A documentação correspondente ao estado atual do sistema está
 concentrada em `diagramas-sistema.md` e
-`diagrama-classes-sprint6-memento.puml`.
+`diagrama-classes-sprint7-crud-usuarios.puml`.
 
 ## Padrão Command (Sprint 5)
 
@@ -111,6 +110,25 @@ Assim:
 Essa estratégia atende ao requisito de desfazer somente a alteração
 mais recente, sem manter uma pilha completa de versões anteriores.
 
+## CRUD de Usuário e validações (Sprint 7)
+
+A Sprint 7 completa o CRUD de `Usuario` e consolida as validações de
+campo definidas no Laboratório 2:
+
+- `ValidadorLogin` passa a rejeitar logins com números, somando-se às
+  regras já existentes de campo obrigatório e de no máximo 12 caracteres;
+- a entidade `Usuario` ganha `atualizar_dados()`, `alterar_senha()`,
+  `desativar()` e `ativar()`, todas devolvendo uma nova instância;
+- a porta `RepositorioUsuario` passa a declarar `buscar_por_id()`,
+  implementada nos dois mecanismos de persistência (RAM e SQLite);
+- `GerenciadorDeUsuarios` ganha os casos de uso `buscar_usuario_por_id`,
+  `buscar_usuario_por_login`, `atualizar_usuario`, `desativar_usuario` e
+  `reativar_usuario`, além do filtro `apenas_ativos` na listagem;
+- as novas operações são encapsuladas em comandos concretos e expostas
+  pela `FacadeSingletonController`, mantendo o padrão Command;
+- a remoção de usuário é sempre lógica, conforme a
+  [ADR-004](adr/ADR-004-exclusao-logica-de-usuarios.md).
+
 ## Decisões arquiteturais
 
 As principais decisões arquiteturais estão registradas no diretório
@@ -118,4 +136,5 @@ As principais decisões arquiteturais estão registradas no diretório
 
 - adoção de Arquitetura Hexagonal;
 - definição da stack tecnológica;
-- adoção do login como identificador de autenticação.
+- adoção do login como identificador de autenticação;
+- exclusão lógica de usuários e ampliação da porta `RepositorioUsuario`.
