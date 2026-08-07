@@ -7,6 +7,7 @@ from .unidade import (
     ComandoAdicionarUnidade,
     ComandoAtualizarUnidade,
     ComandoBuscarUnidadePorId,
+    ComandoDesfazerAtualizacaoDeUnidade,
     ComandoListarUnidades,
     ComandoRemoverUnidade,
 )
@@ -19,15 +20,16 @@ from .usuario import (
 
 __all__ = [
     "Comando",
-    "ExecutorDeComandos",
-    "ComandoAdicionarUsuario",
-    "ComandoListarUsuarios",
-    "ComandoAutenticarUsuario",
-    "ComandoAutenticar",
     "ComandoAdicionarUnidade",
-    "ComandoListarUnidades",
-    "ComandoBuscarUnidadePorId",
+    "ComandoAdicionarUsuario",
     "ComandoAtualizarUnidade",
-    "ComandoRemoverUnidade",
+    "ComandoAutenticar",
+    "ComandoAutenticarUsuario",
+    "ComandoBuscarUnidadePorId",
     "ComandoContarTotalEntidades",
+    "ComandoDesfazerAtualizacaoDeUnidade",
+    "ComandoListarUnidades",
+    "ComandoListarUsuarios",
+    "ComandoRemoverUnidade",
+    "ExecutorDeComandos",
 ]

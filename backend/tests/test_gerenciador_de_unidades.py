@@ -5,10 +5,13 @@ import pytest
 from gestao_usuarios.adaptadores.repositorio_unidade_em_memoria import (
     RepositorioUnidadeEmMemoria,
 )
-from gestao_usuarios.aplicacao.gerenciador_de_unidades import GerenciadorDeUnidades
+from gestao_usuarios.aplicacao.gerenciador_de_unidades import (
+    GerenciadorDeUnidades,
+)
 from gestao_usuarios.dominio.erros import (
     CnpjDuplicado,
     ErroDeValidacao,
+    NenhumaAtualizacaoParaDesfazer,
     UnidadeNaoEncontrada,
 )
 
@@ -169,6 +172,136 @@ def test_deve_atualizar_unidade():
     assert atualizada.nome == "UBS Centro Atualizada"
     assert atualizada.endereco == "Rua Nova, 200"
     assert atualizada.telefone == "84988887777"
+
+
+# ------------------------------------------------------------------ #
+# Testes — Memento / Desfazer atualização                             #
+# ------------------------------------------------------------------ #
+
+
+def test_deve_desfazer_ultima_atualizacao_e_restaurar_estado_anterior():
+    gerenciador = _criar_gerenciador()
+
+    unidade = gerenciador.adicionar_unidade(
+        nome="UBS Centro",
+        cnpj="12345678000199",
+        endereco="Rua Principal, 100",
+        telefone="84999990000",
+    )
+
+    gerenciador.atualizar_unidade(
+        unidade_id=unidade.id,
+        nome="UBS Centro Atualizada",
+        cnpj="98765432000110",
+        endereco="Rua Nova, 200",
+        telefone="84988887777",
+    )
+
+    restaurada = (
+        gerenciador.desfazer_ultima_atualizacao_de_unidade()
+    )
+
+    assert restaurada.id == unidade.id
+    assert restaurada.nome == "UBS Centro"
+    assert restaurada.cnpj == "12345678000199"
+    assert restaurada.endereco == "Rua Principal, 100"
+    assert restaurada.telefone == "84999990000"
+    assert restaurada.ativa is True
+
+    persistida = gerenciador.buscar_unidade_por_id(unidade.id)
+
+    assert persistida == restaurada
+
+
+def test_duas_atualizacoes_e_um_desfazer_restaura_penultimo_estado():
+    gerenciador = _criar_gerenciador()
+
+    unidade = gerenciador.adicionar_unidade(
+        nome="UBS Original",
+        cnpj="12345678000199",
+        endereco="Rua Original, 100",
+        telefone="84999990000",
+    )
+
+    gerenciador.atualizar_unidade(
+        unidade_id=unidade.id,
+        nome="UBS Primeira Atualização",
+        cnpj="23456789000188",
+        endereco="Rua Primeira, 200",
+        telefone="84988887777",
+    )
+
+    gerenciador.atualizar_unidade(
+        unidade_id=unidade.id,
+        nome="UBS Segunda Atualização",
+        cnpj="34567890000177",
+        endereco="Rua Segunda, 300",
+        telefone="84977776666",
+    )
+
+    restaurada = (
+        gerenciador.desfazer_ultima_atualizacao_de_unidade()
+    )
+
+    assert restaurada.id == unidade.id
+    assert restaurada.nome == "UBS Primeira Atualização"
+    assert restaurada.cnpj == "23456789000188"
+    assert restaurada.endereco == "Rua Primeira, 200"
+    assert restaurada.telefone == "84988887777"
+
+
+def test_segundo_desfazer_sem_nova_atualizacao_lanca_excecao():
+    gerenciador = _criar_gerenciador()
+
+    unidade = gerenciador.adicionar_unidade(
+        nome="UBS Centro",
+        cnpj="12345678000199",
+        endereco="Rua Principal, 100",
+        telefone="84999990000",
+    )
+
+    gerenciador.atualizar_unidade(
+        unidade_id=unidade.id,
+        nome="UBS Atualizada",
+        cnpj="98765432000110",
+        endereco="Rua Nova, 200",
+        telefone="84988887777",
+    )
+
+    gerenciador.desfazer_ultima_atualizacao_de_unidade()
+
+    with pytest.raises(NenhumaAtualizacaoParaDesfazer):
+        gerenciador.desfazer_ultima_atualizacao_de_unidade()
+
+
+def test_atualizacao_invalida_nao_deve_criar_memento():
+    gerenciador = _criar_gerenciador()
+
+    unidade = gerenciador.adicionar_unidade(
+        nome="UBS Centro",
+        cnpj="12345678000199",
+        endereco="Rua Principal, 100",
+        telefone="84999990000",
+    )
+
+    with pytest.raises(ErroDeValidacao):
+        gerenciador.atualizar_unidade(
+            unidade_id=unidade.id,
+            nome="",
+            cnpj="98765432000110",
+            endereco="Rua Nova, 200",
+            telefone="84988887777",
+        )
+
+    with pytest.raises(NenhumaAtualizacaoParaDesfazer):
+        gerenciador.desfazer_ultima_atualizacao_de_unidade()
+
+    persistida = gerenciador.buscar_unidade_por_id(unidade.id)
+
+    assert persistida.nome == "UBS Centro"
+    assert persistida.cnpj == "12345678000199"
+    assert persistida.endereco == "Rua Principal, 100"
+    assert persistida.telefone == "84999990000"
 
 
 # ------------------------------------------------------------------ #
