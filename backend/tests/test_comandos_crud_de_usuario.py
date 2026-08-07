@@ -283,13 +283,14 @@ def test_comando_reativar_usuario_marca_como_ativo(
         )
     )
 
-    reativado = executor.executar(
-        ComandoReativarUsuario(
-            gerenciador_usuarios,
-            usuario_cadastrado.id,
-        )
+    comando = ComandoReativarUsuario(
+        gerenciador_usuarios,
+        usuario_cadastrado.id,
     )
 
+    reativado = executor.executar(comando)
+
+    assert comando.usuario_id == usuario_cadastrado.id
     assert reativado.ativo is True
 
 
