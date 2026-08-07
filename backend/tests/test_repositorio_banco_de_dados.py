@@ -216,3 +216,66 @@ def test_atualizar_usuario_existente_persiste_mudanca():
     assert atualizado is not None
     assert atualizado.ativo is False
     assert atualizado.login == "ana"
+
+
+def test_buscar_por_id_encontra_ou_devolve_none():
+    repositorio = RepositorioUsuarioBancoDeDados(":memory:")
+
+    salvo = repositorio.salvar(
+        _usuario(
+            "11111111111",
+            login="ana",
+        )
+    )
+
+    encontrado = repositorio.buscar_por_id(
+        salvo.id
+    )
+
+    assert encontrado is not None
+    assert encontrado.id == salvo.id
+    assert encontrado.login == "ana"
+    assert repositorio.buscar_por_id(999) is None
+
+
+def test_salvar_usuario_existente_atualiza_o_registro_no_banco():
+    repositorio = RepositorioUsuarioBancoDeDados(":memory:")
+
+    salvo = repositorio.salvar(
+        _usuario(
+            "11111111111",
+            login="ana",
+        )
+    )
+
+    repositorio.salvar(
+        salvo.atualizar_dados(
+            nome="Ana Souza",
+            cpf=salvo.cpf,
+            email=salvo.email,
+            telefone=salvo.telefone,
+            login="anasouza",
+            perfil=salvo.perfil,
+        )
+    )
+
+    atualizado = repositorio.buscar_por_id(salvo.id)
+
+    assert len(repositorio.buscar_todos()) == 1
+    assert atualizado.nome == "Ana Souza"
+    assert atualizado.login == "anasouza"
+
+
+def test_salvar_usuario_desativado_persiste_a_situacao_no_banco():
+    repositorio = RepositorioUsuarioBancoDeDados(":memory:")
+
+    salvo = repositorio.salvar(
+        _usuario(
+            "11111111111",
+            login="ana",
+        )
+    )
+
+    repositorio.salvar(salvo.desativar())
+
+    assert repositorio.buscar_por_id(salvo.id).ativo is False

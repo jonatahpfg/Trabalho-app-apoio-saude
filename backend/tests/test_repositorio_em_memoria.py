@@ -170,3 +170,71 @@ def test_buscar_todos_nao_vaza_a_colecao_interna():
     assert len(
         repositorio.buscar_todos()
     ) == 1
+
+
+def test_buscar_por_id_encontra_ou_devolve_none():
+    repositorio = RepositorioUsuarioEmMemoria()
+
+    salvo = repositorio.salvar(
+        _usuario(
+            "11111111111",
+            "usuarioum",
+        )
+    )
+
+    encontrado = repositorio.buscar_por_id(
+        salvo.id
+    )
+
+    assert encontrado is not None
+    assert encontrado.login == "usuarioum"
+    assert repositorio.buscar_por_id(999) is None
+
+
+def test_buscar_por_id_nao_vaza_a_colecao_interna():
+    repositorio = RepositorioUsuarioEmMemoria()
+
+    salvo = repositorio.salvar(
+        _usuario(
+            "11111111111",
+            "usuarioum",
+        )
+    )
+
+    encontrado = repositorio.buscar_por_id(
+        salvo.id
+    )
+    encontrado.nome = "Alterado por fora"
+
+    assert (
+        repositorio.buscar_por_id(salvo.id).nome
+        == "Ana"
+    )
+
+
+def test_salvar_usuario_existente_atualiza_sem_criar_novo_registro():
+    repositorio = RepositorioUsuarioEmMemoria()
+
+    salvo = repositorio.salvar(
+        _usuario(
+            "11111111111",
+            "usuarioum",
+        )
+    )
+
+    repositorio.salvar(
+        salvo.atualizar_dados(
+            nome="Ana Souza",
+            cpf=salvo.cpf,
+            email=salvo.email,
+            telefone=salvo.telefone,
+            login="anasouza",
+            perfil=salvo.perfil,
+        )
+    )
+
+    assert len(repositorio.buscar_todos()) == 1
+    assert (
+        repositorio.buscar_por_id(salvo.id).login
+        == "anasouza"
+    )
