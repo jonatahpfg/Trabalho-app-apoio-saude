@@ -1,0 +1,318 @@
+@startuml diagramas_c4_sistema
+' ==============================================================================
+' Diagramas de Arquitetura C4 e Diagrama de Classes com Padrões Coloridos
+' Sistema: App Experimental de Apoio à Triagem Médica
+' ==============================================================================
+
+' ==============================================================================
+' LEGENDA DE CORES DOS PADRÕES DE PROJETO GoF
+' ==============================================================================
+legend top right
+  |<#LightBlue>  Facade               | Centralização de acesso à aplicação |
+  |<#DeepSkyBlue> Singleton            | Instância única da Fachada |
+  |<#LightGreen> Command              | Encapsulamento de operações como objetos |
+  |<#PeachPuff>  Memento              | Captura e restauração de estado de UBS |
+  |<#LightCoral> Proxy                | Autorização por perfil (RBAC) |
+  |<#Plum>       Observer             | Notificação de eventos de login |
+  |<#LightCyan>  Repository           | Abstração da camada de persistência |
+  |<#Khaki>      Factory Method       | Seleção dinâmica de fábrica de repositórios |
+  |<#Moccasin>   Abstract Factory     | Famílias de repositórios (RAM / SQLite) |
+  |<#LightPink>  Adapter              | Adaptação de logs para repositório |
+  |<#Wheat>      Template Method      | Estrutura básica de relatórios de acesso |
+endlegend
+
+' ==============================================================================
+' MODELO C4 — NÍVEL 1: CONTEXTO DO SISTEMA
+' ==============================================================================
+package "C4 Level 1: Contexto do Sistema" {
+    actor "Administrador" as Admin
+    actor "Gestor da Unidade" as Gestor
+    actor "Médico" as Medico
+    actor "Paciente (Futuro)" as Paciente
+
+    rectangle "App de Apoio à Triagem Médica" <<System>> as SistemaTriagem #SkyBlue {
+        note right of SistemaTriagem
+          Gerencia Usuários, Unidades Básicas de Saúde,
+          Controle de Acesso RBAC, Auditoria de Log
+          e Desfazer de UBS.
+        end note
+    }
+
+    rectangle "Sistema de Arquivos de Log" <<External System>> as SysLog #LightGray
+    rectangle "Banco de Dados SQLite / Memória RAM" <<External System>> as SysDB #LightGray
+
+    Admin --> SistemaTriagem : Gerencia usuários, UBS e relatórios
+    Gestor --> SistemaTriagem : Gerencia UBS e relatórios
+    Medico --> SistemaTriagem : Autentica e consulta dados
+    Paciente ..> SistemaTriagem : [Planejado] Agendamento e triagem
+    SistemaTriagem --> SysLog : Grava logs de acesso
+    SistemaTriagem --> SysDB : Persiste dados de negócios
+}
+
+' ==============================================================================
+' MODELO C4 — NÍVEL 2: CONTÊINERES
+' ==============================================================================
+package "C4 Level 2: Contêineres do Sistema" {
+    rectangle "Aplicativo Mobile (React Native)" <<Container>> as AppMobile #Gold {
+        note right of AppMobile: Interface futura para médicos e pacientes
+    }
+    rectangle "CLI / Script de Execução Python" <<Container>> as AppCLI #Gold {
+        note right of AppCLI: Ponto de entrada atual do backend (__main__.py)
+    }
+
+    rectangle "Backend Python (Hexagonal Architecture)" <<Container>> as BackendApp #SkyBlue {
+        note right of BackendApp: Contém Domínio, Aplicação, Portas e Adaptadores
+    }
+
+    database "SQLite (usuarios.db)" <<Container Database>> as DBBD #Salmon
+    file "Arquivo de Log (acessos.log)" <<Container File>> as LogFile #Khaki
+
+    AppCLI --> BackendApp : Executa operações via Facade
+    AppMobile ..> BackendApp : Requisições HTTP/REST [Planejado]
+    BackendApp --> DBBD : Leitura e Escrita SQL via Repositório SQLite
+    BackendApp --> LogFile : Gravação e leitura de logs via Adaptador
+}
+
+' ==============================================================================
+' MODELO C4 — NÍVEL 3: COMPONENTES DO BACKEND
+' ==============================================================================
+package "C4 Level 3: Componentes Internos do Backend" {
+    component "FacadeSingletonController" as CompFacade #LightBlue {
+        note right: Padrão Facade + Singleton
+    }
+    component "ExecutorDeComandos" as CompInvoker #LightGreen {
+        note right: Padrão Command (Invoker)
+    }
+    component "Proxies de Autorização" as CompProxy #LightCoral {
+        note right: Padrão Proxy (RBAC)
+    }
+    component "GerenciadorDeUsuarios / Unidades" as CompServices #White
+    component "Publicador & Observadores" as CompObserver #Plum {
+        note right: Padrão Observer
+    }
+    component "HistoricoDeUnidade & Memento" as CompMemento #PeachPuff {
+        note right: Padrão Memento
+    }
+    component "Seletor & Fábricas de Repositório" as CompFactories #Moccasin {
+        note right: Factory Method + Abstract Factory
+    }
+    component "Repositórios & Adaptador de Log" as CompRepos #LightCyan {
+        note right: Repository + Adapter
+    }
+
+    CompFacade --> CompInvoker : Delega execução
+    CompInvoker --> CompProxy : Executa comando autorizado
+    CompProxy --> CompServices : Delega se autorizado pelo perfil
+    CompServices --> CompObserver : Notifica eventos de login
+    CompServices --> CompMemento : Salva/restaura Memento de UBS
+    CompServices --> CompFactories : Solicita repositórios
+    CompFactories --> CompRepos : Instancia repositórios concretos
+}
+
+' ==============================================================================
+' MODELO C4 — NÍVEL 4: CÓDIGO / DIAGRAMA DE CLASSES COM PADRÕES COLORIDOS
+' ==============================================================================
+package "C4 Level 4: Diagrama de Classes e Padrões Coloridos" {
+
+    ' --- Domínio / Entidades ---
+    class Usuario {
+        +id: int
+        +nome: str
+        +cpf: str
+        +email: str
+        +telefone: str
+        +login: str
+        +senha_hash: str
+        +perfil: Perfil
+        +ativo: bool
+        +criar(dados) Usuario
+        +atualizar_dados(dados) Usuario
+        +alterar_senha(senha) Usuario
+        +desativar() Usuario
+        +ativar() Usuario
+    }
+
+    class Perfil <<enumeration>> {
+        ADMINISTRADOR
+        GESTOR
+        MEDICO
+    }
+
+    class UnidadeBasicaSaude {
+        +id: int
+        +nome: str
+        +cnpj: str
+        +endereco: str
+        +telefone: str
+        +ativa: bool
+        +criar_memento() MementoUnidadeBasicaSaude
+        +restaurar(memento)
+    }
+
+    class MementoUnidadeBasicaSaude #PeachPuff {
+        +id: int
+        +nome: str
+        +cnpj: str
+        +endereco: str
+        +telefone: str
+        +ativa: bool
+    }
+
+    class HistoricoDeUnidade #PeachPuff {
+        -ultimo: MementoUnidadeBasicaSaude
+        +salvar(memento)
+        +obter_ultimo() MementoUnidadeBasicaSaude
+        +descartar_ultimo()
+    }
+
+    class RegistroDeAcesso {
+        +id: int
+        +email: str
+        +sucesso: bool
+        +data_hora: datetime
+    }
+
+    ' --- Padrão Facade & Singleton ---
+    class FacadeSingletonController #LightBlue {
+        -instancia_unica: FacadeSingletonController #DeepSkyBlue
+        -executor: ExecutorDeComandos
+        +instancia() FacadeSingletonController
+        +adicionar_usuario(dados)
+        +listar_usuarios(apenas_ativos)
+        +autenticar(login, senha)
+        +adicionar_unidade(dados)
+        +desfazer_ultima_atualizacao_de_unidade()
+        +obter_quantidade_total_entidades_cadastradas() int
+    }
+
+    ' --- Padrão Command ---
+    interface Comando #LightGreen {
+        +executar() Any
+    }
+
+    class ExecutorDeComandos #LightGreen {
+        -historico: List~Comando~
+        +executar(comando)
+    }
+
+    class ComandoAdicionarUsuario #LightGreen
+    class ComandoAtualizarUnidade #LightGreen
+    class ComandoDesfazerAtualizacaoDeUnidade #LightGreen
+
+    Comando <|.. ComandoAdicionarUsuario
+    Comando <|.. ComandoAtualizarUnidade
+    Comando <|.. ComandoDesfazerAtualizacaoDeUnidade
+
+    ' --- Padrão Proxy ---
+    class ProxyGerenciadorDeUsuarios #LightCoral {
+        -gerenciador: GerenciadorDeUsuarios
+        -usuario_autenticado: Usuario
+        +adicionar_usuario(dados)
+        -_verificar_perfil(perfis, operacao)
+    }
+
+    class ProxyGerenciadorDeUnidades #LightCoral {
+        -gerenciador: GerenciadorDeUnidades
+        -usuario_autenticado: Usuario
+        +atualizar_unidade(dados)
+        +desfazer_ultima_atualizacao_de_unidade()
+        -_verificar_perfil(perfis, operacao)
+    }
+
+    ' --- Padrão Observer ---
+    class EventoDeAutenticacao #Plum {
+        +login: str
+        +sucesso: bool
+        +data_hora: datetime
+    }
+
+    interface ObservadorDeAutenticacao #Plum {
+        +atualizar(evento)
+    }
+
+    class PublicadorDeEventosDeAutenticacao #Plum {
+        -observadores: List~ObservadorDeAutenticacao~
+        +assinar(observador)
+        +notificar(evento)
+    }
+
+    class ObservadorDeLogDeAutenticacao #Plum
+    class ObservadorDeEstatisticasDeAutenticacao #Plum
+
+    ObservadorDeAutenticacao <|.. ObservadorDeLogDeAutenticacao
+    ObservadorDeAutenticacao <|.. ObservadorDeEstatisticasDeAutenticacao
+    PublicadorDeEventosDeAutenticacao --> ObservadorDeAutenticacao : notifica
+
+    ' --- Padrão Repository ---
+    interface RepositorioUsuario #LightCyan {
+        +salvar(usuario)
+        +buscar_por_id(id)
+        +buscar_por_login(login)
+    }
+
+    interface RepositorioUnidadeBasicaSaude #LightCyan {
+        +salvar(unidade)
+        +buscar_por_id(id)
+    }
+
+    interface RepositorioRegistroDeAcesso #LightCyan {
+        +salvar(registro)
+        +buscar_todos()
+    }
+
+    class RepositorioUsuarioBancoDeDados #LightCyan
+    class RepositorioUsuarioEmMemoria #LightCyan
+    RepositorioUsuario <|.. RepositorioUsuarioBancoDeDados
+    RepositorioUsuario <|.. RepositorioUsuarioEmMemoria
+
+    ' --- Abstract Factory & Factory Method ---
+    interface FabricaRepositorio #Moccasin {
+        +criar_repositorio_usuario()
+        +criar_repositorio_unidade_basica_saude()
+    }
+
+    class FabricaRepositorioEmMemoria #Moccasin
+    class FabricaRepositorioBancoDeDados #Moccasin
+    FabricaRepositorio <|.. FabricaRepositorioEmMemoria
+    FabricaRepositorio <|.. FabricaRepositorioBancoDeDados
+
+    class SeletorFabrica #Khaki {
+        +obter_fabrica_repositorio(tipo) FabricaRepositorio
+    }
+    SeletorFabrica ..> FabricaRepositorio : seleciona
+
+    ' --- Padrão Adapter ---
+    class AdaptadorArquivoDeLog #LightPink {
+        -arquivo_log: ArquivoDeLogSimples
+        +salvar(registro)
+        +buscar_todos()
+    }
+    class ArquivoDeLogSimples #LightPink {
+        +anotar(linha)
+        +ler_linhas()
+    }
+    RepositorioRegistroDeAcesso <|.. AdaptadorArquivoDeLog
+    AdaptadorArquivoDeLog --> ArquivoDeLogSimples : adapta
+
+    ' --- Padrão Template Method ---
+    abstract class RelatorioDeAcessos #Wheat {
+        +gerar() str
+        #calcular_estatisticas(registros)
+        #cabecalho()*
+        #linha_por_email(estatistica)*
+        #rodape(estatisticas)*
+    }
+    class RelatorioDeAcessosTexto #Wheat
+    class RelatorioDeAcessosCsv #Wheat
+    RelatorioDeAcessos <|-- RelatorioDeAcessosTexto
+    RelatorioDeAcessos <|-- RelatorioDeAcessosCsv
+
+    ' --- Relações Principais ---
+    FacadeSingletonController --> ExecutorDeComandos : usa
+    ExecutorDeComandos --> Comando : executa
+    ComandoAdicionarUsuario --> ProxyGerenciadorDeUsuarios : invoca
+    ProxyGerenciadorDeUsuarios --> PublicadorDeEventosDeAutenticacao : notifica login
+    UnidadeBasicaSaude ..> MementoUnidadeBasicaSaude : cria/restaura
+    HistoricoDeUnidade --> MementoUnidadeBasicaSaude : guarda
+}
+@enduml

@@ -1,1026 +1,335 @@
-# Diagramas do Sistema — Gerenciamento de Usuários
+# Diagramas do Sistema — Modelo C4 e Padrões de Projeto Coloridos
 
 **App Experimental de Triagem em Saúde**
 
-Este documento concentra os diagramas do **contexto de Gerenciamento de Usuários**,
-incluindo cadastro e autenticação de usuários, cadastro de Unidades Básicas de Saúde,
-registro de acessos, geração de relatórios de estatísticas e restauração da última
-atualização de uma UBS.
-
-Os diagramas estão alinhados ao estado atual do projeto até a **Sprint 7**, contemplando:
-
-- autenticação por perfil;
-- CRUD completo de `Usuario`, incluindo busca, atualização e desativação lógica;
-- CRUD de `UnidadeBasicaSaude`;
-- registro de acessos dos usuários;
-- relatórios de estatísticas de acesso;
-- separação entre negócio e persistência por Repository;
-- padrões Factory Method, Abstract Factory, Adapter, Template Method, Facade,
-  Singleton, Command, Memento, Proxy e Observer;
-- autorização por perfil nas operações dos gerenciadores;
-- publicação de eventos de autenticação para log e estatísticas;
-- desfazer da última atualização bem-sucedida de uma Unidade Básica de Saúde;
-- validação de login e de senha por meio de exceções de domínio;
-- persistência do CRUD de usuários nos dois mecanismos disponíveis (RAM e SQLite).
-
-> O **Paciente** e o módulo de triagem clínica aparecem no escopo geral do produto,
-> mas ainda não fazem parte deste contexto implementado no backend até a Sprint 7.
+Este documento contempla a especificação completa da arquitetura do **App Experimental de Apoio à Triagem Médica**, utilizando o **Modelo C4** em 4 níveis de detalhamento (Contexto, Contêineres, Componentes e Código) e a identificação visual dos 11 **Padrões de Projeto GoF** através de códigos de cores.
 
 ---
 
-## 1. Descrição dos 3 casos de uso mais relevantes
+## 🎨 Mapeamento de Padrões de Projeto por Cores
 
-### UC01 — Autenticar usuário
+A tabela abaixo define os 11 padrões de projeto integrados ao backend, categorizados por tipo (Criacional, Estrutural, Comportamental), cor atribuída nos diagramas visualizáveis, classes participantes e objetivo principal no sistema.
 
-| Campo | Descrição |
-| ----- | --------- |
-| Atores principais | Administrador, Gestor da Unidade, Médico |
-| Objetivo | Permitir que um usuário acesse o sistema por meio de login e senha, recebendo as permissões correspondentes ao seu perfil. |
-| Pré-condições | O usuário deve estar cadastrado e ativo. |
-| Pós-condições | O acesso é autorizado ou recusado e a tentativa é registrada para fins de auditoria e estatísticas. |
-| Requisitos relacionados | RF03 — Autenticar usuários; NF008 — Controle de acesso por perfil. |
-
-**Fluxo principal**
-
-1. O usuário informa login e senha.
-2. O sistema valida se os campos obrigatórios foram preenchidos.
-3. O sistema consulta o usuário pelo login.
-4. O sistema verifica a senha utilizando o hash armazenado.
-5. O sistema verifica se o usuário está ativo.
-6. O sistema registra a tentativa como `RegistroDeAcesso`.
-7. O sistema libera o acesso conforme o perfil do usuário.
-
-**Fluxos alternativos**
-
-- Login inexistente ou senha incorreta: o sistema lança `CredenciaisInvalidas`.
-- Usuário inativo: o sistema lança `UsuarioInativo`.
-- Login ou senha ausentes: o sistema lança `ErroDeValidacao`.
-
-### UC02 — Gerenciar usuários
-
-| Campo | Descrição |
-| ----- | --------- |
-| Atores principais | Administrador, Gestor da Unidade |
-| Objetivo | Cadastrar, consultar, atualizar e desativar os usuários que operam o sistema. |
-| Pré-condições | O ator deve estar autenticado e possuir perfil autorizado. |
-| Pós-condições | O usuário é cadastrado, listado, consultado, atualizado ou desativado conforme as regras de domínio. |
-| Requisitos relacionados | RF02 — Gerenciar gestores e médicos; RF03 — Autenticar usuários; NF008 — Controle de acesso por perfil; Sprint 2 — validação de campos com exceções. |
-
-**Fluxo principal**
-
-1. O ator solicita o cadastro de um novo usuário.
-2. O sistema recebe nome, CPF, e-mail, telefone, login, senha e perfil.
-3. O sistema valida os dados informados.
-4. O sistema verifica se o CPF já está cadastrado.
-5. O sistema verifica se o login já está cadastrado.
-6. O sistema cria a entidade `Usuario`.
-7. A senha é armazenada somente na forma de hash.
-8. O sistema persiste o usuário por meio da porta `RepositorioUsuario`.
-9. O sistema permite listar os usuários cadastrados, opcionalmente apenas os ativos.
-10. O sistema permite buscar um usuário pelo identificador ou pelo login.
-11. O sistema permite atualizar os dados cadastrais de um usuário existente,
-    revalidando todas as regras antes de persistir.
-12. O sistema permite desativar logicamente um usuário, preservando o cadastro
-    e bloqueando o seu acesso.
-
-**Fluxos alternativos**
-
-- CPF já cadastrado: o sistema lança `CpfDuplicado`.
-- Login já cadastrado: o sistema lança `LoginDuplicado`.
-- Dados inválidos: o sistema lança `ErroDeValidacao`.
-- Usuário inexistente na busca, na atualização ou na desativação: o sistema lança
-  `UsuarioNaoEncontrado`.
-- Atualização inválida: nenhuma alteração é persistida e o cadastro permanece
-  como estava.
-- Autenticação de usuário desativado: o sistema lança `UsuarioInativo`.
-- Falha de persistência: o sistema lança a exceção correspondente
-  (`ErroDeAcessoAoBanco` ou `ErroDeAcessoAoArquivo`).
-
-### UC03 — Gerenciar Unidades Básicas de Saúde
-
-| Campo | Descrição |
-| ----- | --------- |
-| Atores principais | Administrador, Gestor da Unidade |
-| Objetivo | Realizar o CRUD de Unidades Básicas de Saúde e permitir desfazer a última atualização bem-sucedida. |
-| Pré-condições | O ator deve estar autenticado e possuir permissão para gerenciar unidades. |
-| Pós-condições | A unidade é cadastrada, consultada, atualizada, removida logicamente ou restaurada para o estado anterior à última atualização. |
-| Requisitos relacionados | Sprint 3 — CRUD de UBS; Sprint 6 — aplicação do padrão Memento. |
-
-**Fluxo principal**
-
-1. O ator solicita o cadastro de uma Unidade Básica de Saúde.
-2. O sistema recebe nome, CNPJ, endereço e telefone.
-3. O sistema valida os campos obrigatórios e o formato do CNPJ.
-4. O sistema verifica se já existe unidade com o mesmo CNPJ.
-5. O sistema cria a entidade `UnidadeBasicaSaude`.
-6. O sistema persiste a unidade por meio da porta `RepositorioUnidadeBasicaSaude`.
-7. O sistema permite listar, buscar, atualizar e remover logicamente a unidade.
-8. Antes de uma atualização válida, o estado anterior da UBS é capturado em um
-   `MementoUnidadeBasicaSaude`.
-9. Após a atualização ser persistida com sucesso, o estado anterior é armazenado
-   em `HistoricoDeUnidade`.
-10. Quando solicitado, o sistema pode desfazer a última atualização bem-sucedida,
-    restaurando o estado guardado no Memento.
-
-**Fluxos alternativos**
-
-- CNPJ já cadastrado: o sistema lança `CnpjDuplicado`.
-- Unidade inexistente: o sistema lança `UnidadeNaoEncontrada`.
-- Remoção: a unidade não é apagada fisicamente; ela é marcada como inativa.
-- Atualização inválida: nenhum novo Memento é registrado no histórico.
-- Não existe atualização disponível para desfazer: o sistema lança
-  `NenhumaAtualizacaoParaDesfazer`.
-- Depois de um desfazer bem-sucedido, o Memento é descartado; um segundo desfazer
-  sem uma nova atualização lança `NenhumaAtualizacaoParaDesfazer`.
+| Padrão GoF | Categoria | Cor / Badge | Classes e Interfaces Participantes | Objetivo no Sistema |
+| :--- | :--- | :--- | :--- | :--- |
+| **Facade** | Estrutural | `LightBlue` `#ADD8E6` | `FacadeSingletonController` (FacadeDoSistema) | Centralizar o acesso simplificado a todas as operações de negócio para os clientes da aplicação. |
+| **Singleton** | Criacional | `DeepSkyBlue` `#00BFFF` | `FacadeSingletonController` | Garantir que exista uma única instância global acessível da Fachada durante o ciclo de vida do sistema. |
+| **Command** | Comportamental | `LightGreen` `#90EE90` | `Comando`, `ExecutorDeComandos`, `ComandoAdicionarUsuario`, `ComandoAtualizarUnidade`, `ComandoDesfazerAtualizacaoDeUnidade`, etc. | Desacoplar a requisição do usuário de sua execução real, encapsulando cada operação em um objeto executável por um Invoker central. |
+| **Memento** | Comportamental | `PeachPuff` `#FFDAB9` | `UnidadeBasicaSaude` (Originator), `MementoUnidadeBasicaSaude` (Memento), `HistoricoDeUnidade` (Caretaker) | Capturar e restaurar o estado anterior da última atualização bem-sucedida de uma UBS sem violar o encapsulamento. |
+| **Proxy** | Estrutural | `LightCoral` `#F08080` | `ProxyGerenciadorDeUsuarios`, `ProxyGerenciadorDeUnidades`, `AcessoNegado` | Interceptar chamadas de métodos nos gerenciadores para aplicar autorização baseada em perfil de acesso (RBAC). |
+| **Observer** | Comportamental | `Plum` `#DDA0DD` | `PublicadorDeEventosDeAutenticacao` (Subject), `ObservadorDeAutenticacao` (Observer), `ObservadorDeLogDeAutenticacao`, `ObservadorDeEstatisticasDeAutenticacao` | Disparar e notificar eventos de login (sucesso/falha) para múltiplos módulos de auditoria de forma desacoplada. |
+| **Repository** | Estrutural | `LightCyan` `#E0FFFF` | `RepositorioUsuario`, `RepositorioUnidadeBasicaSaude`, `RepositorioRegistroDeAcesso` | Abstrair o acesso e a persistência de dados de domínio mantendo a independência de mecanismos de armazenamento. |
+| **Factory Method** | Criacional | `Khaki` `#F0E68C` | `SeletorFabrica` | Decidir dinamicamente qual fábrica concreta instanciar com base na configuração do sistema. |
+| **Abstract Factory** | Criacional | `Moccasin` `#FFE4B5` | `FabricaRepositorio`, `FabricaRepositorioEmMemoria`, `FabricaRepositorioBancoDeDados` | Fornecer uma interface para criar famílias de repositórios compatíveis (RAM vs SQLite). |
+| **Adapter** | Estrutural | `LightPink` `#FFB6C1` | `AdaptadorArquivoDeLog`, `ArquivoDeLogSimples` | Converter a interface legada de escrita em arquivos de log para a porta `RepositorioRegistroDeAcesso`. |
+| **Template Method** | Comportamental | `Wheat` `#F5DEB3` | `RelatorioDeAcessos`, `RelatorioDeAcessosTexto`, `RelatorioDeAcessosCsv` | Definir o esqueleto do algoritmo de geração de relatório de acessos, delegando a formatação do cabeçalho, linhas e rodapé para as subclasses. |
 
 ---
 
-## 2. Regras de negócio
+## 🏛️ Modelo C4 de Arquitetura
 
-As principais regras atualmente implementadas são:
+O modelo C4 organiza a arquitetura do sistema em 4 níveis de abstração progressiva:
 
-- **RN01 — Login obrigatório:** todo usuário deve possuir login.
-- **RN02 — Tamanho do login:** o login deve possuir no máximo 12 caracteres.
-- **RN02.1 — Login sem números:** o login não pode conter dígitos (Sprint 2).
-- **RN03 — Login único:** dois usuários não podem possuir o mesmo login.
-- **RN04 — Autenticação:** a autenticação utiliza login e senha.
-- **RN05 — E-mail válido:** o e-mail cadastrado deve possuir formato válido.
-- **RN06 — Tamanho da senha:** a senha deve possuir entre 8 e 128 caracteres.
-- **RN07 — Complexidade da senha:** a senha deve possuir pelo menos três entre os
-  quatro grupos: letras maiúsculas, letras minúsculas, números e caracteres especiais.
-- **RN08 — Senha e dados pessoais:** a senha não pode ser igual ao nome ou ao e-mail.
-- **RN09 — Perfil:** o usuário deve possuir perfil Administrador, Gestor ou Médico.
-- **RN10 — Última atualização de UBS:** somente o estado anterior da última atualização
-  bem-sucedida fica disponível para desfazer.
-- **RN11 — Atualização inválida:** uma atualização que falha não cria nem substitui
-  o Memento disponível.
-- **RN12 — Consumo do Memento:** depois de uma restauração bem-sucedida, o Memento
-  utilizado é descartado.
-- **RN13 — Estado completo da UBS:** o Memento preserva `id`, `nome`, `cnpj`,
-  `endereco`, `telefone` e `ativa`.
-- **RN14 — Atualização revalidada:** a atualização de um usuário aplica exatamente
-  as mesmas validações da criação; uma atualização inválida não altera o cadastro.
-- **RN15 — Unicidade na atualização:** o CPF e o login continuam únicos na
-  atualização, desconsiderando o próprio usuário na comparação.
-- **RN16 — Exclusão lógica de usuário:** o usuário nunca é apagado; ele é marcado
-  como inativo e passa a ser recusado na autenticação com `UsuarioInativo`.
-- **RN17 — Senha na atualização:** a senha só é alterada quando informada, sempre
-  revalidada pela política de senhas e armazenada apenas como hash.
-- **RN18 — Paridade entre mecanismos:** o CRUD de usuários se comporta de forma
-  idêntica no armazenamento em RAM e em SQLite.
-
----
-
-## 3. Diagrama de Casos de Uso
-
-O diagrama abaixo representa os casos de uso contemplados no contexto de gerenciamento
-até a Sprint 6: autenticação, gerenciamento de usuários, gerenciamento de UBS,
-registro de acessos, geração de relatórios e desfazer da última atualização de UBS.
-
-```mermaid
-flowchart LR
-    Admin([Administrador])
-    Gestor([Gestor da Unidade])
-    Medico([Médico])
-
-    subgraph Sistema[Gerenciamento de Usuários e Unidades]
-        UC_AUTH(("Autenticar por Perfil"))
-
-        UC_GER_USU["Gerenciar Usuários"]
-        UC_ADD_USU["Cadastrar Usuário"]
-        UC_LIST_USU["Listar Usuários"]
-
-        UC_GER_UBS["Gerenciar UBS"]
-        UC_ADD_UBS["Cadastrar UBS"]
-        UC_LIST_UBS["Listar UBS"]
-        UC_SEARCH_UBS["Buscar UBS"]
-        UC_UPDATE_UBS["Atualizar UBS"]
-        UC_UNDO_UBS["Desfazer última atualização de UBS"]
-        UC_REMOVE_UBS["Remover UBS"]
-
-        UC_SELF["Consultar Próprio Cadastro"]
-        UC_REG_ACESSO["Registrar Acesso"]
-        UC_RELATORIO["Gerar Relatório de Estatísticas de Acesso"]
-    end
-
-    Admin --> UC_AUTH
-    Gestor --> UC_AUTH
-    Medico --> UC_AUTH
-
-    Admin --> UC_GER_USU
-    Admin --> UC_GER_UBS
-    Admin --> UC_RELATORIO
-
-    Gestor --> UC_GER_USU
-    Gestor --> UC_GER_UBS
-    Gestor --> UC_RELATORIO
-
-    Medico --> UC_SELF
-
-    UC_GER_USU -.->|"include"| UC_AUTH
-    UC_GER_UBS -.->|"include"| UC_AUTH
-    UC_SELF -.->|"include"| UC_AUTH
-    UC_RELATORIO -.->|"include"| UC_AUTH
-
-    UC_GER_USU --> UC_ADD_USU
-    UC_GER_USU --> UC_LIST_USU
-
-    UC_GER_UBS --> UC_ADD_UBS
-    UC_GER_UBS --> UC_LIST_UBS
-    UC_GER_UBS --> UC_SEARCH_UBS
-    UC_GER_UBS --> UC_UPDATE_UBS
-    UC_GER_UBS --> UC_UNDO_UBS
-    UC_GER_UBS --> UC_REMOVE_UBS
-
-    UC_AUTH -.->|"include"| UC_REG_ACESSO
-    UC_RELATORIO -.->|"consulta"| UC_REG_ACESSO
+```text
+Nível 1: Contexto      ---> Visão geral das pessoas (atores) e do sistema em seu ecossistema.
+Nível 2: Contêineres   ---> Visão das grandes partes tecnológicas executáveis (backend, banco, log).
+Nível 3: Componentes   ---> Visão dos blocos lógicos internos do backend Python.
+Nível 4: Código        ---> Diagrama de classes detalhado com identificação de padrões por cores.
 ```
 
-> **Observação:** o diagrama considera o contexto implementado até a Sprint 6.
-> Funcionalidades futuras do produto, como triagem clínica, pacientes e IA, devem ser
-> modeladas em diagramas próprios quando forem incorporadas ao backend.
+---
+
+### C4 — Nível 1: Diagrama de Contexto
+
+O diagrama de contexto apresenta os atores que interagem com o sistema e os limites externos.
+
+```mermaid
+flowchart TD
+    subgraph Atores["Atores do Sistema"]
+        Admin["👤 Administrador\n(Gestão total do sistema)"]
+        Gestor["👤 Gestor da Unidade\n(Gestão de UBS e relatórios)"]
+        Medico["👤 Médico\n(Consultas e atendimentos)"]
+        Paciente["👤 Paciente (Futuro)\n(Agendamento e triagem)"]
+    end
+
+    subgraph SistemaBoundary["Fronteira do Sistema"]
+        AppTriagem["🏥 App Experimental de Apoio à Triagem Médica\n(Sistema Principal)"]
+    end
+
+    subgraph Externos["Sistemas Externos / Persistência"]
+        SysDB[("💾 Banco SQLite / RAM\n(Armazenamento de Dados)")]
+        SysLog["📝 Arquivo de Log\n(Auditoria de Acessos)"]
+    end
+
+    Admin -->|"Cadastra usuários, UBS e gera relatórios"| AppTriagem
+    Gestor -->|"Gerencia UBS e gera relatórios"| AppTriagem
+    Medico -->|"Autentica-se e consulta dados"| AppTriagem
+    Paciente -.->|"Visualizar histórico e agendamentos [Futuro]"| AppTriagem
+
+    AppTriagem -->|"Persiste entidades"| SysDB
+    AppTriagem -->|"Registra eventos de login"| SysLog
+```
 
 ---
 
-## 4. Diagrama de Classe de Análise até a Sprint 7
+### C4 — Nível 2: Diagrama de Contêineres
 
-Este diagrama representa o estado atual do projeto até a Sprint 7. Ele contempla:
+O diagrama de contêineres mostra as escolhas tecnológicas e como cada contêiner se comunica.
 
-- CRUD completo de `Usuario`, com busca, atualização e desativação lógica;
-- CRUD de `UnidadeBasicaSaude`;
-- entidade `RegistroDeAcesso`;
-- padrão **Repository** para separar negócio e persistência;
-- **Factory Method** e **Abstract Factory** para seleção/criação de repositórios;
-- **Adapter** para adaptar o arquivo de log à porta de registro de acessos;
-- **Template Method** para relatórios de estatísticas de acesso;
-- **Facade** e **Singleton** no controller/fachada principal;
-- **Command** para encapsular as operações da camada de aplicação;
-- **Memento** para restaurar o estado anterior da última UBS atualizada.
+```mermaid
+flowchart TD
+    subgraph Clientes["Contêineres de Interface"]
+        CLI["💻 CLI / Execution Script\n(Python Script __main__.py)"]
+        MobileApp["📱 Mobile App (Futuro)\n(React Native App)"]
+    end
+
+    subgraph BackendContainer["Contêiner Backend Python"]
+        BackendService["⚙️ Backend Service\n(Python 3.10 / Arquitetura Hexagonal)\n[Fachada, Comandos, Domínio, Adapters]"]
+    end
+
+    subgraph Armazenamento["Contêineres de Dados"]
+        SQLiteDB[("🗄️ SQLite Database\n(usuarios.db / Tabelas SQL)")]
+        RAMDB[("🧠 RAM Memory Storage\n(Dicionários em Memória)")]
+        LogFile["📄 Log File\n(acessos.log)"]
+    end
+
+    CLI -->|"Invoca operações locais"| BackendService
+    MobileApp -.->|"Requisições REST/HTTP [Futuro]"| BackendService
+
+    BackendService -->|"Lê / Grava via SQLite Adapter"| SQLiteDB
+    BackendService -->|"Lê / Grava via Memory Adapter"| RAMDB
+    BackendService -->|"Anexa registros via Log Adapter"| LogFile
+```
+
+---
+
+### C4 — Nível 3: Diagrama de Componentes
+
+O diagrama de componentes detalha a organização interna do **Backend Service (Python)**.
+
+```mermaid
+flowchart TD
+    subgraph ComponentesBackend["Backend Python Container (Componentes Internos)"]
+        FacadeComp["🔷 FacadeSingletonController\n(Ponto de Entrada / Singleton)"]
+        InvokerComp["🟩 ExecutorDeComandos\n(Invoker Command)"]
+        ProxyComp["🟥 Proxies de Autorização\n(ProxyGerenciadorUsuarios / Unidades)"]
+        DomainComp["⬜ Gerenciadores de Domínio\n(GerenciadorDeUsuarios / Unidades)"]
+        ObserverComp["🟪 Publicador & Observadores\n(PublicadorDeEventosDeAutenticacao)"]
+        MementoComp["🟧 Histórico & Memento UBS\n(HistoricoDeUnidade)"]
+        FactoryComp["🟨 Seletor & Fábricas de Repositório\n(Abstract Factory / Factory Method)"]
+        RepoComp["🟫 Repositórios & Log Adapter\n(Repository / Adapter)"]
+    end
+
+    FacadeComp -->|"Repassa comandos"| InvokerComp
+    InvokerComp -->|"Executa comando"| ProxyComp
+    ProxyComp -->|"Delega se autorizado pelo perfil"| DomainComp
+    DomainComp -->|"Notifica tentativas de login"| ObserverComp
+    DomainComp -->|"Captura / Restaura Memento"| MementoComp
+    DomainComp -->|"Solicita porta de repositório"| FactoryComp
+    FactoryComp -->|"Instancia repositório"| RepoComp
+```
+
+---
+
+### C4 — Nível 4: Diagrama de Código (Classes e Padrões Coloridos)
+
+O diagrama abaixo representa o nível de código do sistema, com caixas de estilo identificando visualmente cada padrão GoF.
 
 ```mermaid
 classDiagram
-    %% =======================
-    %% Domínio / Entidades
-    %% =======================
+    %% Estilos de Cores dos Padrões
+    style FacadeSingletonController fill:#ADD8E6,stroke:#333,stroke-width:2px
+    style Comando fill:#90EE90,stroke:#333,stroke-width:1px
+    style ExecutorDeComandos fill:#90EE90,stroke:#333,stroke-width:2px
+    style ComandoAdicionarUsuario fill:#90EE90,stroke:#333,stroke-width:1px
+    style ComandoAtualizarUnidade fill:#90EE90,stroke:#333,stroke-width:1px
+    style ComandoDesfazerAtualizacaoDeUnidade fill:#90EE90,stroke:#333,stroke-width:1px
+    style MementoUnidadeBasicaSaude fill:#FFDAB9,stroke:#333,stroke-width:2px
+    style HistoricoDeUnidade fill:#FFDAB9,stroke:#333,stroke-width:2px
+    style ProxyGerenciadorDeUsuarios fill:#F08080,stroke:#333,stroke-width:2px
+    style ProxyGerenciadorDeUnidades fill:#F08080,stroke:#333,stroke-width:2px
+    style PublicadorDeEventosDeAutenticacao fill:#DDA0DD,stroke:#333,stroke-width:2px
+    style ObservadorDeAutenticacao fill:#DDA0DD,stroke:#333,stroke-width:1px
+    style ObservadorDeLogDeAutenticacao fill:#DDA0DD,stroke:#333,stroke-width:1px
+    style ObservadorDeEstatisticasDeAutenticacao fill:#DDA0DD,stroke:#333,stroke-width:1px
+    style RepositorioUsuario fill:#E0FFFF,stroke:#333,stroke-width:1px
+    style RepositorioUnidadeBasicaSaude fill:#E0FFFF,stroke:#333,stroke-width:1px
+    style RepositorioRegistroDeAcesso fill:#E0FFFF,stroke:#333,stroke-width:1px
+    style SeletorFabrica fill:#F0E68C,stroke:#333,stroke-width:2px
+    style FabricaRepositorio fill:#FFE4B5,stroke:#333,stroke-width:1px
+    style FabricaRepositorioEmMemoria fill:#FFE4B5,stroke:#333,stroke-width:1px
+    style FabricaRepositorioBancoDeDados fill:#FFE4B5,stroke:#333,stroke-width:1px
+    style AdaptadorArquivoDeLog fill:#FFB6C1,stroke:#333,stroke-width:2px
+    style ArquivoDeLogSimples fill:#FFB6C1,stroke:#333,stroke-width:1px
+    style RelatorioDeAcessos fill:#F5DEB3,stroke:#333,stroke-width:2px
+    style RelatorioDeAcessosTexto fill:#F5DEB3,stroke:#333,stroke-width:1px
+    style RelatorioDeAcessosCsv fill:#F5DEB3,stroke:#333,stroke-width:1px
 
+    %% Classes de Domínio
     class Usuario {
-        <<Entity>>
-        +id: int
-        +nome: string
-        +cpf: string
-        +email: string
-        +telefone: string
-        +login: string
-        +senha_hash: string
-        +perfil: Perfil
-        +ativo: boolean
-        +criar(dados) Usuario
-        +atualizar_dados(dados) Usuario
-        +alterar_senha(senha) Usuario
-        +desativar() Usuario
-        +ativar() Usuario
-    }
-
-    class Perfil {
-        <<enumeration>>
-        ADMINISTRADOR
-        GESTOR
-        MEDICO
+        +int id
+        +string nome
+        +string cpf
+        +string email
+        +string login
+        +string senha_hash
+        +Perfil perfil
+        +bool ativo
     }
 
     class UnidadeBasicaSaude {
-        <<Entity>>
-        <<Originator>>
-        +id: int
-        +nome: string
-        +cnpj: string
-        +endereco: string
-        +telefone: string
-        +ativa: boolean
-        +criar(dados) UnidadeBasicaSaude
+        +int id
+        +string nome
+        +string cnpj
+        +string endereco
+        +string telefone
+        +bool ativa
         +criar_memento() MementoUnidadeBasicaSaude
-        +restaurar(memento) void
+        +restaurar(memento)
     }
 
     class MementoUnidadeBasicaSaude {
-        <<Memento>>
-        +nome: string
-        +cnpj: string
-        +endereco: string
-        +telefone: string
-        +ativa: boolean
-        +id: int
-    }
-
-    class RegistroDeAcesso {
-        <<Entity>>
-        +id: int
-        +email: string
-        +sucesso: boolean
-        +data_hora: datetime
-        +criar(dados) RegistroDeAcesso
-    }
-
-    Usuario --> Perfil : possui
-    UnidadeBasicaSaude ..> MementoUnidadeBasicaSaude : cria/restaura
-
-    %% =======================
-    %% Portas / Repository
-    %% =======================
-
-    class RepositorioUsuario {
-        <<Repository>>
-        <<interface>>
-        +salvar(usuario) Usuario
-        +buscar_todos() List~Usuario~
-        +buscar_por_id(id) Usuario
-        +buscar_por_cpf(cpf) Usuario
-        +buscar_por_email(email) Usuario
-        +buscar_por_login(login) Usuario
-    }
-
-    class RepositorioUnidadeBasicaSaude {
-        <<Repository>>
-        <<interface>>
-        +salvar(unidade) UnidadeBasicaSaude
-        +buscar_todas() List~UnidadeBasicaSaude~
-        +buscar_por_id(id) UnidadeBasicaSaude
-        +buscar_por_cnpj(cnpj) UnidadeBasicaSaude
-    }
-
-    class RepositorioRegistroDeAcesso {
-        <<Repository>>
-        <<interface>>
-        +salvar(registro) RegistroDeAcesso
-        +buscar_todos() List~RegistroDeAcesso~
-    }
-
-    %% =======================
-    %% Aplicação / Business
-    %% =======================
-
-    class GerenciadorDeUsuarios {
-        <<Control>>
-        -repositorio: RepositorioUsuario
-        -repositorio_acessos: RepositorioRegistroDeAcesso
-        +adicionar_usuario(dados) Usuario
-        +listar_usuarios(apenas_ativos) List~Usuario~
-        +buscar_usuario_por_id(id) Usuario
-        +buscar_usuario_por_login(login) Usuario
-        +atualizar_usuario(dados) Usuario
-        +desativar_usuario(id) Usuario
-        +reativar_usuario(id) Usuario
-        +autenticar(login, senha) Usuario
+        +int id
+        +string nome
+        +string cnpj
+        +string endereco
+        +string telefone
+        +bool ativa
     }
 
     class HistoricoDeUnidade {
-        <<Caretaker>>
-        -ultimo: MementoUnidadeBasicaSaude
-        +salvar(memento) void
+        -MementoUnidadeBasicaSaude ultimo
+        +salvar(memento)
         +obter_ultimo() MementoUnidadeBasicaSaude
-        +descartar_ultimo() void
-        +possui_estado: bool
+        +descartar_ultimo()
     }
 
-    class GerenciadorDeUnidades {
-        <<Control>>
-        -repositorio: RepositorioUnidadeBasicaSaude
-        -historico: HistoricoDeUnidade
-        +adicionar_unidade(dados) UnidadeBasicaSaude
-        +listar_unidades(apenas_ativas) List~UnidadeBasicaSaude~
-        +buscar_unidade_por_id(id) UnidadeBasicaSaude
-        +atualizar_unidade(dados) UnidadeBasicaSaude
-        +desfazer_ultima_atualizacao_de_unidade() UnidadeBasicaSaude
-        +remover_unidade(id) UnidadeBasicaSaude
-    }
-
+    %% Fachada e Singleton
     class FacadeSingletonController {
-        <<Facade>>
-        <<Singleton>>
-        -instancia_unica: FacadeSingletonController
-        -gerenciador_usuarios: GerenciadorDeUsuarios
-        -gerenciador_unidades: GerenciadorDeUnidades
-        -executor: ExecutorDeComandos
+        -FacadeSingletonController instancia_unica
+        -ExecutorDeComandos executor
         +instancia() FacadeSingletonController
-        +adicionar_usuario(dados) Usuario
-        +listar_usuarios(apenas_ativos) List~Usuario~
-        +buscar_usuario_por_id(id) Usuario
-        +buscar_usuario_por_login(login) Usuario
-        +atualizar_usuario(dados) Usuario
-        +desativar_usuario(id) Usuario
-        +reativar_usuario(id) Usuario
-        +autenticar(login, senha) Usuario
-        +adicionar_unidade(dados) UnidadeBasicaSaude
-        +listar_unidades() List~UnidadeBasicaSaude~
-        +atualizar_unidade(dados) UnidadeBasicaSaude
-        +desfazer_ultima_atualizacao_de_unidade() UnidadeBasicaSaude
-        +remover_unidade(id) UnidadeBasicaSaude
-        +executar_comando(comando) Any
+        +adicionar_usuario(dados)
+        +desfazer_ultima_atualizacao_de_unidade()
         +obter_quantidade_total_entidades_cadastradas() int
     }
 
-    class ExecutorDeComandos {
-        <<Invoker>>
-        -historico: List~Comando~
-        +executar(comando) Any
-        +limpar_historico()
-    }
-
+    %% Command
     class Comando {
-        <<Command>>
         <<interface>>
-        +executar() Any
+        +executar()*
     }
-
+    class ExecutorDeComandos {
+        -List~Comando~ historico
+        +executar(comando)
+    }
     class ComandoAdicionarUsuario
-    class ComandoListarUsuarios
-    class ComandoBuscarUsuarioPorId
-    class ComandoBuscarUsuarioPorLogin
-    class ComandoAtualizarUsuario
-    class ComandoDesativarUsuario
-    class ComandoReativarUsuario
-    class ComandoAutenticarUsuario
-    class ComandoAdicionarUnidade
-    class ComandoListarUnidades
-    class ComandoBuscarUnidadePorId
     class ComandoAtualizarUnidade
     class ComandoDesfazerAtualizacaoDeUnidade
-    class ComandoRemoverUnidade
-    class ComandoContarTotalEntidades
 
     Comando <|.. ComandoAdicionarUsuario
-    Comando <|.. ComandoListarUsuarios
-    Comando <|.. ComandoBuscarUsuarioPorId
-    Comando <|.. ComandoBuscarUsuarioPorLogin
-    Comando <|.. ComandoAtualizarUsuario
-    Comando <|.. ComandoDesativarUsuario
-    Comando <|.. ComandoReativarUsuario
-    Comando <|.. ComandoAutenticarUsuario
-    Comando <|.. ComandoAdicionarUnidade
-    Comando <|.. ComandoListarUnidades
-    Comando <|.. ComandoBuscarUnidadePorId
     Comando <|.. ComandoAtualizarUnidade
     Comando <|.. ComandoDesfazerAtualizacaoDeUnidade
-    Comando <|.. ComandoRemoverUnidade
-    Comando <|.. ComandoContarTotalEntidades
 
-    GerenciadorDeUsuarios ..> RepositorioUsuario : usa porta
-    GerenciadorDeUsuarios ..> RepositorioRegistroDeAcesso : registra acessos
-    GerenciadorDeUsuarios ..> Usuario : cria/autentica
-
-    GerenciadorDeUnidades ..> RepositorioUnidadeBasicaSaude : usa porta
-    GerenciadorDeUnidades ..> UnidadeBasicaSaude : CRUD/restaura
-    GerenciadorDeUnidades --> HistoricoDeUnidade : mantém último estado
-    HistoricoDeUnidade --> MementoUnidadeBasicaSaude : guarda
-
-    FacadeSingletonController --> ExecutorDeComandos : usa invoker
-    FacadeSingletonController ..> Comando : instancia comandos
-    ExecutorDeComandos --> Comando : executa
-    ComandoAdicionarUsuario --> GerenciadorDeUsuarios : invoca
-    ComandoListarUsuarios --> GerenciadorDeUsuarios : invoca
-    ComandoBuscarUsuarioPorId --> GerenciadorDeUsuarios : invoca
-    ComandoBuscarUsuarioPorLogin --> GerenciadorDeUsuarios : invoca
-    ComandoAtualizarUsuario --> GerenciadorDeUsuarios : invoca
-    ComandoDesativarUsuario --> GerenciadorDeUsuarios : invoca
-    ComandoReativarUsuario --> GerenciadorDeUsuarios : invoca
-    ComandoAutenticarUsuario --> GerenciadorDeUsuarios : invoca
-    ComandoAdicionarUnidade --> GerenciadorDeUnidades : invoca
-    ComandoListarUnidades --> GerenciadorDeUnidades : invoca
-    ComandoBuscarUnidadePorId --> GerenciadorDeUnidades : invoca
-    ComandoAtualizarUnidade --> GerenciadorDeUnidades : invoca
-    ComandoDesfazerAtualizacaoDeUnidade --> GerenciadorDeUnidades : invoca
-    ComandoRemoverUnidade --> GerenciadorDeUnidades : invoca
-    ComandoContarTotalEntidades --> GerenciadorDeUsuarios : invoca
-    ComandoContarTotalEntidades --> GerenciadorDeUnidades : invoca
-
-    %% =======================
-    %% Factory / Seleção de repositórios
-    %% =======================
-
-    class FabricaRepositorio {
-        <<Abstract Factory>>
-        <<interface>>
-        +criar_repositorio_usuario() RepositorioUsuario
-        +criar_repositorio_unidade_basica_saude() RepositorioUnidadeBasicaSaude
-        +criar_repositorio_registro_de_acesso() RepositorioRegistroDeAcesso
-    }
-
-    class FabricaRepositorioEmMemoria {
-        <<Concrete Factory>>
-    }
-
-    class FabricaRepositorioBancoDeDados {
-        <<Concrete Factory>>
-    }
-
-    class SeletorFabrica {
-        <<Factory Method>>
-        +obter_fabrica_repositorio(tipo) FabricaRepositorio
-    }
-
-    FabricaRepositorio <|.. FabricaRepositorioEmMemoria
-    FabricaRepositorio <|.. FabricaRepositorioBancoDeDados
-    SeletorFabrica ..> FabricaRepositorio : seleciona
-
-    %% =======================
-    %% Infra / Adaptadores
-    %% =======================
-
-    class RepositorioUsuarioEmMemoria {
-        <<Repository Adapter>>
-    }
-
-    class RepositorioUsuarioBancoDeDados {
-        <<Repository Adapter>>
-    }
-
-    class RepositorioUnidadeEmMemoria {
-        <<Repository Adapter>>
-    }
-
-    class RepositorioRegistroDeAcessoEmMemoria {
-        <<Repository Adapter>>
-    }
-
-    RepositorioUsuario <|.. RepositorioUsuarioEmMemoria
-    RepositorioUsuario <|.. RepositorioUsuarioBancoDeDados
-    RepositorioUnidadeBasicaSaude <|.. RepositorioUnidadeEmMemoria
-    RepositorioRegistroDeAcesso <|.. RepositorioRegistroDeAcessoEmMemoria
-
-    RepositorioUsuarioEmMemoria ..> Usuario : persiste
-    RepositorioUsuarioBancoDeDados ..> Usuario : persiste
-    RepositorioUnidadeEmMemoria ..> UnidadeBasicaSaude : persiste
-    RepositorioRegistroDeAcessoEmMemoria ..> RegistroDeAcesso : persiste
-
-    %% =======================
-    %% Adapter
-    %% =======================
-
-    class AdaptadorArquivoDeLog {
-        <<Adapter>>
-        +salvar(registro) RegistroDeAcesso
-        +buscar_todos() List~RegistroDeAcesso~
-    }
-
-    class ArquivoDeLogSimples {
-        <<Adaptee>>
-        +anotar(linha)
-        +ler_linhas() List~string~
-    }
-
-    RepositorioRegistroDeAcesso <|.. AdaptadorArquivoDeLog
-    AdaptadorArquivoDeLog --> ArquivoDeLogSimples : adapta
-
-    %% =======================
-    %% Template Method
-    %% =======================
-
-    class RelatorioDeAcessos {
-        <<Template Method>>
-        <<abstract>>
-        +gerar() string
-        #calcular_estatisticas(registros) EstatisticasDeAcesso
-        #cabecalho() string
-        #linha_por_email(estatistica) string
-        #rodape(estatisticas) string
-    }
-
-    class RelatorioDeAcessosTexto
-    class RelatorioDeAcessosCsv
-
-    RelatorioDeAcessos ..> RepositorioRegistroDeAcesso : consulta registros
-    RelatorioDeAcessos <|-- RelatorioDeAcessosTexto
-    RelatorioDeAcessos <|-- RelatorioDeAcessosCsv
-```
-
----
-
-## 5. Sprint 3 — Padrões Facade + Singleton e CRUD de Unidade Básica de Saúde
-
-A Sprint 3 introduziu o cadastro completo da entidade `UnidadeBasicaSaude`,
-incluindo criação, listagem, busca por id, atualização e remoção lógica.
-
-Também foi criada a `FacadeSingletonController`, que funciona como:
-
-- **Facade:** centraliza o acesso aos gerenciadores de usuários e unidades;
-- **Singleton:** disponibiliza uma única instância principal da fachada;
-- **ponto de contagem:** expõe `obter_quantidade_total_entidades_cadastradas()`.
-
-O arquivo PlantUML específico da Sprint 3 está disponível em:
-
-[`diagrama-classes-v2.puml`](diagrama-classes-v2.puml)
-
----
-
-## 6. Sprint 4 — Diagrama Final de Padrões de Projeto
-
-A Sprint 4 consolida a separação entre a camada de negócio (`aplicacao` e `dominio`)
-e a camada de persistência/infraestrutura (`portas` e `adaptadores`).
-
-O arquivo PlantUML do diagrama final está disponível em:
-
-[`diagrama-classes-final-sprint4.puml`](diagrama-classes-final-sprint4.puml)
-
-| Padrão | Onde aparece no projeto |
-| ------ | ------------------------ |
-| Repository | `RepositorioUsuario`, `RepositorioUnidadeBasicaSaude`, `RepositorioRegistroDeAcesso` |
-| Factory Method | `obter_fabrica_repositorio()` em `seletor_fabrica.py` |
-| Abstract Factory | `FabricaRepositorio`, `FabricaRepositorioEmMemoria`, `FabricaRepositorioBancoDeDados` |
-| Adapter | `AdaptadorArquivoDeLog`, adaptando `ArquivoDeLogSimples` para `RepositorioRegistroDeAcesso` |
-| Template Method | `RelatorioDeAcessos.gerar()` com `RelatorioDeAcessosTexto` e `RelatorioDeAcessosCsv` |
-| Facade | `FacadeSingletonController` |
-| Singleton | `FacadeSingletonController.instancia()` |
-| Command | `Comando`, `ExecutorDeComandos`, comandos em `gestao_usuarios.aplicacao.comandos` e `FacadeSingletonController` |
-| Memento | `UnidadeBasicaSaude`, `MementoUnidadeBasicaSaude`, `HistoricoDeUnidade`, `GerenciadorDeUnidades` e `ComandoDesfazerAtualizacaoDeUnidade` |
-
----
-
-## 7. Sprint 5 — Padrão Command
-
-A Sprint 5 refatora a camada de aplicação para integrar o padrão **Command (GoF)**,
-desacoplando a fachada (`FacadeSingletonController` / `FacadeDoSistema`) dos
-gerenciadores (`GerenciadorDeUsuarios` e `GerenciadorDeUnidades`) e centralizando
-o disparo das operações de negócio no `ExecutorDeComandos`.
-
-### Padrão Command
-
-**Classes participantes:** `Comando`, `ComandoAdicionarUsuario`,
-`ComandoListarUsuarios`, `ComandoAutenticarUsuario`,
-`ComandoAdicionarUnidade`, `ComandoListarUnidades`,
-`ComandoBuscarUnidadePorId`, `ComandoAtualizarUnidade`,
-`ComandoDesfazerAtualizacaoDeUnidade`, `ComandoRemoverUnidade`,
-`ComandoContarTotalEntidades`, `ExecutorDeComandos` e
-`FacadeSingletonController` (`FacadeDoSistema`).
-
-**Objetivo:** encapsular as operações da camada de negócio como objetos,
-reduzindo o acoplamento entre a fachada e os gerenciadores e permitindo organizar
-a execução das ações do sistema.
-
----
-
-## 8. Sprint 6 — Padrão Memento
-
-A Sprint 6 integra o padrão **Memento (GoF)** ao gerenciamento de
-`UnidadeBasicaSaude`, permitindo desfazer a última atualização bem-sucedida.
-
-### Padrão Memento
-
-**Originator — `UnidadeBasicaSaude`:**
-
-- `criar_memento()` cria uma representação do estado atual da UBS;
-- `restaurar(memento)` recupera todos os dados armazenados no estado anterior.
-
-**Memento — `MementoUnidadeBasicaSaude`:**
-
-- objeto imutável;
-- armazena `id`, `nome`, `cnpj`, `endereco`, `telefone` e `ativa`;
-- não contém regras de persistência ou de negócio.
-
-**Caretaker — `HistoricoDeUnidade`:**
-
-- mantém apenas o último Memento disponível;
-- `salvar()` substitui o estado anteriormente armazenado;
-- `obter_ultimo()` recupera o estado disponível;
-- `descartar_ultimo()` remove o estado após uma restauração bem-sucedida.
-
-**Coordenação — `GerenciadorDeUnidades`:**
-
-1. obtém a UBS existente;
-2. valida a nova versão;
-3. cria o Memento do estado anterior;
-4. persiste a atualização;
-5. somente após o sucesso da persistência registra o Memento no histórico;
-6. no desfazer, restaura o estado e persiste novamente a UBS;
-7. somente após a restauração bem-sucedida descarta o Memento.
-
-**Integração com Command e Facade:**
-
-- `ComandoDesfazerAtualizacaoDeUnidade` encapsula a solicitação de desfazer;
-- `ExecutorDeComandos` executa o comando;
-- `FacadeSingletonController.desfazer_ultima_atualizacao_de_unidade()` expõe a
-  operação para os clientes da aplicação.
-
-### Regra de histórico
-
-O projeto não mantém uma pilha de versões. `HistoricoDeUnidade` mantém somente o
-estado anterior da **última atualização bem-sucedida**. Portanto, se ocorrerem
-duas atualizações consecutivas, um único desfazer restaura o estado correspondente
-à primeira atualização, e uma nova tentativa de desfazer sem outra atualização
-gera `NenhumaAtualizacaoParaDesfazer`.
-
-Os participantes do Memento aparecem no diagrama de classes vigente:
-
-[`diagrama-classes-sprint7-crud-usuarios.puml`](diagrama-classes-sprint7-crud-usuarios.puml)
-
----
-
-## 9. Sprint 6 — Padrões Proxy e Observer
-
-A Sprint 6 introduz dois novos padrões GoF na camada de aplicação:
-
-- **Proxy** — autorização por perfil antes de cada operação;
-- **Observer** — publicação/notificação de eventos de autenticação para log e estatísticas.
-
----
-
-### Padrão Proxy — Autorização por Perfil
-
-*Classes participantes:* `ProxyGerenciadorDeUsuarios`, `ProxyGerenciadorDeUnidades`, `GerenciadorDeUsuarios` (RealSubject), `GerenciadorDeUnidades` (RealSubject), `AcessoNegado`.
-
-*Objetivo:* interpor uma camada de verificação de perfil entre o chamador e os gerenciadores reais. O cliente recebe um Proxy em vez do gerenciador direto; o Proxy verifica o perfil do usuário autenticado e, se autorizado, delega ao objeto real. Caso contrário, lança `AcessoNegado` sem nunca alcançar o gerenciador.
-
-#### Matriz de Permissões
-
-**Usuários**
-
-| Operação | ADMINISTRADOR | GESTOR | MÉDICO |
-|---|:---:|:---:|:---:|
-| `adicionar_usuario` | ✅ | ❌ | ❌ |
-| `listar_usuarios` | ✅ | ✅ | ❌ |
-| `buscar_usuario_por_id` | ✅ | ✅ | ❌ |
-| `buscar_usuario_por_login` | ✅ | ✅ | ❌ |
-| `atualizar_usuario` | ✅ | ❌ | ❌ |
-| `desativar_usuario` | ✅ | ❌ | ❌ |
-| `reativar_usuario` | ✅ | ❌ | ❌ |
-| `autenticar` | ✅ | ✅ | ✅ |
-
-O cadastro de usuário guarda dado pessoal: a leitura fica restrita aos perfis
-que já podiam listar, e toda escrita — incluir, alterar, desativar e reativar —
-é privativa do ADMINISTRADOR. `atualizar_usuario` é a operação mais sensível do
-cadastro, porque altera perfil e senha: sem essa restrição, um perfil não
-autorizado poderia promover a si mesmo a ADMINISTRADOR.
-
-**Unidades Básicas de Saúde**
-
-| Operação | ADMINISTRADOR | GESTOR | MÉDICO |
-|---|:---:|:---:|:---:|
-| `adicionar_unidade` | ✅ | ✅ | ❌ |
-| `listar_unidades` | ✅ | ✅ | ✅ |
-| `buscar_unidade_por_id` | ✅ | ✅ | ✅ |
-| `atualizar_unidade` | ✅ | ✅ | ❌ |
-| `desfazer_ultima_atualizacao_de_unidade` | ✅ | ✅ | ❌ |
-| `remover_unidade` | ✅ | ❌ | ❌ |
-
-Desfazer reescreve os dados da unidade, então exige os mesmos perfis de
-`atualizar_unidade`: é a operação que ela reverte.
-
-> **Cobertura da autorização.** O Proxy só protege o que intercepta. Para que
-> uma operação nova no gerenciador não fique acessível sem verificação de
-> perfil, `tests/test_cobertura_dos_proxies.py` compara a superfície pública
-> dos gerenciadores com a dos Proxies e falha quando alguma operação passa a
-> não ser interceptada ou delega sem chamar `_verificar_perfil`.
-
-#### Diagrama de Classes — Proxy
-
-```mermaid
-classDiagram
-    class GerenciadorDeUsuarios {
-        <<RealSubject>>
-        +adicionar_usuario(dados) Usuario
-        +listar_usuarios(apenas_ativos) List~Usuario~
-        +buscar_usuario_por_id(id) Usuario
-        +buscar_usuario_por_login(login) Usuario
-        +atualizar_usuario(dados) Usuario
-        +desativar_usuario(id) Usuario
-        +reativar_usuario(id) Usuario
-        +autenticar(login, senha) Usuario
-    }
-
+    %% Proxy
     class ProxyGerenciadorDeUsuarios {
-        <<Proxy>>
-        -gerenciador: GerenciadorDeUsuarios
-        -usuario_autenticado: Usuario
-        +adicionar_usuario(dados) Usuario
-        +listar_usuarios(apenas_ativos) List~Usuario~
-        +buscar_usuario_por_id(id) Usuario
-        +buscar_usuario_por_login(login) Usuario
-        +atualizar_usuario(dados) Usuario
-        +desativar_usuario(id) Usuario
-        +reativar_usuario(id) Usuario
-        +autenticar(login, senha) Usuario
+        -GerenciadorDeUsuarios gerenciador
+        -Usuario usuario_autenticado
+        +adicionar_usuario(dados)
         -_verificar_perfil(perfis, operacao)
     }
-
-    class GerenciadorDeUnidades {
-        <<RealSubject>>
-        +adicionar_unidade(dados) UnidadeBasicaSaude
-        +listar_unidades(apenas_ativas) List~UnidadeBasicaSaude~
-        +buscar_unidade_por_id(id) UnidadeBasicaSaude
-        +atualizar_unidade(dados) UnidadeBasicaSaude
-        +desfazer_ultima_atualizacao_de_unidade() UnidadeBasicaSaude
-        +remover_unidade(id) UnidadeBasicaSaude
-    }
-
     class ProxyGerenciadorDeUnidades {
-        <<Proxy>>
-        -gerenciador: GerenciadorDeUnidades
-        -usuario_autenticado: Usuario
-        +adicionar_unidade(dados) UnidadeBasicaSaude
-        +listar_unidades(apenas_ativas) List~UnidadeBasicaSaude~
-        +buscar_unidade_por_id(id) UnidadeBasicaSaude
-        +atualizar_unidade(dados) UnidadeBasicaSaude
-        +desfazer_ultima_atualizacao_de_unidade() UnidadeBasicaSaude
-        +remover_unidade(id) UnidadeBasicaSaude
+        -GerenciadorDeUnidades gerenciador
+        -Usuario usuario_autenticado
+        +atualizar_unidade(dados)
         -_verificar_perfil(perfis, operacao)
     }
 
-    class AcessoNegado {
-        <<exception>>
+    %% Observer
+    class PublicadorDeEventosDeAutenticacao {
+        -List~ObservadorDeAutenticacao~ observadores
+        +assinar(observador)
+        +notificar(evento)
     }
-
-    ProxyGerenciadorDeUsuarios --> GerenciadorDeUsuarios : delega
-    ProxyGerenciadorDeUsuarios ..> AcessoNegado : lança
-    ProxyGerenciadorDeUnidades --> GerenciadorDeUnidades : delega
-    ProxyGerenciadorDeUnidades ..> AcessoNegado : lança
-    ProxyGerenciadorDeUsuarios --> Usuario : verifica perfil
-    ProxyGerenciadorDeUnidades --> Usuario : verifica perfil
-```
-
----
-
-### Padrão Observer — Eventos de Autenticação
-
-*Classes participantes:* `PublicadorDeEventosDeAutenticacao` (Subject), `ObservadorDeAutenticacao` (Observer/ABC), `ObservadorDeLogDeAutenticacao`, `ObservadorDeEstatisticasDeAutenticacao` (Concrete Observers), `EventoDeAutenticacao` (objeto de dados).
-
-*Objetivo:* desacoplar o `GerenciadorDeUsuarios` dos seus interessados em eventos de autenticação. A cada tentativa de login (sucesso ou falha), o gerenciador publica um `EventoDeAutenticacao` no publicador; o publicador despacha o evento para todos os observadores inscritos sem que o gerenciador precise conhecê-los.
-
-#### Diagrama de Classes — Observer
-
-```mermaid
-classDiagram
-    class EventoDeAutenticacao {
-        <<dataclass>>
-        +login: str
-        +sucesso: bool
-        +data_hora: datetime
-    }
-
     class ObservadorDeAutenticacao {
-        <<Observer>>
-        <<abstract>>
+        <<interface>>
         +atualizar(evento)*
     }
-
-    class PublicadorDeEventosDeAutenticacao {
-        <<Subject>>
-        -observadores: List~ObservadorDeAutenticacao~
-        +assinar(observador)
-        +cancelar_assinatura(observador)
-        +notificar(evento)
-        +total_observadores: int
-    }
-
-    class ObservadorDeLogDeAutenticacao {
-        <<ConcreteObserver>>
-        -historico: List~EventoDeAutenticacao~
-        +atualizar(evento)
-        +historico: List~EventoDeAutenticacao~
-        +limpar()
-    }
-
-    class ObservadorDeEstatisticasDeAutenticacao {
-        <<ConcreteObserver>>
-        -total: int
-        -sucessos: int
-        -falhas: int
-        +atualizar(evento)
-        +total_tentativas: int
-        +total_sucessos: int
-        +total_falhas: int
-        +resumo() dict
-        +zerar()
-    }
-
-    class GerenciadorDeUsuarios {
-        <<Control>>
-        -publicador: PublicadorDeEventosDeAutenticacao
-        +autenticar(login, senha) Usuario
-        -_publicar_evento(login, sucesso)
-    }
+    class ObservadorDeLogDeAutenticacao
+    class ObservadorDeEstatisticasDeAutenticacao
 
     ObservadorDeAutenticacao <|.. ObservadorDeLogDeAutenticacao
     ObservadorDeAutenticacao <|.. ObservadorDeEstatisticasDeAutenticacao
-
     PublicadorDeEventosDeAutenticacao --> ObservadorDeAutenticacao : notifica
-    PublicadorDeEventosDeAutenticacao ..> EventoDeAutenticacao : usa
 
-    GerenciadorDeUsuarios --> PublicadorDeEventosDeAutenticacao : publica em
-    GerenciadorDeUsuarios ..> EventoDeAutenticacao : cria
+    %% Repositories e Abstract Factory
+    class RepositorioUsuario {
+        <<interface>>
+        +salvar(usuario)
+        +buscar_por_id(id)
+    }
+    class FabricaRepositorio {
+        <<interface>>
+        +criar_repositorio_usuario()
+    }
+    class SeletorFabrica {
+        +obter_fabrica_repositorio(tipo) FabricaRepositorio
+    }
+
+    %% Adapter
+    class AdaptadorArquivoDeLog {
+        -ArquivoDeLogSimples arquivo_log
+        +salvar(registro)
+    }
+    class ArquivoDeLogSimples
+
+    AdaptadorArquivoDeLog --> ArquivoDeLogSimples : adapta
+
+    %% Template Method
+    class RelatorioDeAcessos {
+        <<abstract>>
+        +gerar() string
+        #cabecalho()*
+        #linha_por_email(estatistica)*
+        #rodape(estatisticas)*
+    }
+    class RelatorioDeAcessosTexto
+    class RelatorioDeAcessosCsv
+
+    RelatorioDeAcessos <|-- RelatorioDeAcessosTexto
+    RelatorioDeAcessos <|-- RelatorioDeAcessosCsv
+
+    %% Relações da Fachada e Executores
+    FacadeSingletonController --> ExecutorDeComandos : usa
+    ExecutorDeComandos --> Comando : executa
+    ComandoAdicionarUsuario --> ProxyGerenciadorDeUsuarios : invoca
+    UnidadeBasicaSaude ..> MementoUnidadeBasicaSaude : cria/restaura
+    HistoricoDeUnidade --> MementoUnidadeBasicaSaude : guarda
 ```
 
 ---
 
-## 10. Sprint 7 — CRUD de Usuário e validações
+## 📋 Descrição dos Casos de Uso Principais
 
-A Sprint 7 completa o CRUD de `Usuario` e consolida as validações de campo
-definidas no Laboratório 2 (Sprint 2), mantendo a arquitetura hexagonal e os
-padrões já adotados nas sprints anteriores.
+### UC01 — Autenticar Usuário
+- **Atores:** Administrador, Gestor da Unidade, Médico.
+- **Objetivo:** Autenticar um usuário por `login` e `senha` e emitir os eventos de auditoria.
+- **Pré-condições:** Usuário cadastrado e ativo.
+- **Pós-condições:** Acesso concedido ou exceção lançada; evento publicado para `ObservadorDeLogDeAutenticacao` e `ObservadorDeEstatisticasDeAutenticacao`.
 
-### Validação de login
+### UC02 — Gerenciar Usuários
+- **Atores:** Administrador (escrita) e Gestor (consulta).
+- **Objetivo:** Cadastrar, listar, buscar por ID/login, atualizar e desativar/reativar usuários logicamente.
+- **Validações:** Login sem números, tamanho máximo de 12 caracteres, senha conforme regras IAM, CPF único.
 
-`ValidadorLogin` passa a aplicar as três regras do Laboratório 2:
+### UC03 — Gerenciar Unidades Básicas de Saúde
+- **Atores:** Administrador e Gestor da Unidade.
+- **Objetivo:** Realizar operações CRUD em UBS e permitir restaurar o estado anterior.
 
-| Regra | Comportamento |
-| ----- | ------------- |
-| Obrigatório | `ErroDeValidacao` quando ausente, vazio ou só com espaços |
-| Máximo de 12 caracteres | `ErroDeValidacao` acima do limite |
-| Sem números | `ErroDeValidacao` quando qualquer dígito é encontrado |
+### UC04 — Desfazer Última Atualização de UBS
+- **Atores:** Administrador e Gestor da Unidade.
+- **Objetivo:** Restaurar o estado anterior exato da UBS modificada na última operação de atualização bem-sucedida por meio do padrão **Memento**.
 
-A senha permanece validada por `ValidadorSenha` conforme a política do AWS IAM:
-de 8 a 128 caracteres, ao menos três dos quatro grupos (maiúsculas, minúsculas,
-números e caracteres especiais) e diferente do nome e do e-mail do usuário.
-
-### Operações acrescentadas
-
-| Camada | Acréscimo |
-| ------ | --------- |
-| Domínio | `Usuario.atualizar_dados`, `Usuario.alterar_senha`, `Usuario.desativar`, `Usuario.ativar` e o erro `UsuarioNaoEncontrado` |
-| Portas | `RepositorioUsuario.buscar_por_id` |
-| Adaptadores | `buscar_por_id` em `RepositorioUsuarioEmMemoria` e em `RepositorioUsuarioBancoDeDados` |
-| Aplicação | `buscar_usuario_por_id`, `buscar_usuario_por_login`, `atualizar_usuario`, `desativar_usuario`, `reativar_usuario` e o filtro `apenas_ativos` na listagem |
-| Command | `ComandoBuscarUsuarioPorId`, `ComandoBuscarUsuarioPorLogin`, `ComandoAtualizarUsuario`, `ComandoDesativarUsuario` e `ComandoReativarUsuario` |
-| Facade | as mesmas operações expostas ao cliente, sempre via `ExecutorDeComandos` |
-
-As operações da entidade devolvem uma nova instância de `Usuario` em vez de
-alterar a existente, de modo que uma validação que falha nunca deixa o objeto
-em um estado intermediário inválido.
-
-### Exclusão lógica
-
-A remoção de usuário segue a mesma decisão já aplicada às Unidades Básicas de
-Saúde: o registro nunca é apagado. `desativar_usuario` apenas marca o usuário
-como inativo, o histórico de acessos é preservado e a autenticação passa a
-recusá-lo com `UsuarioInativo`. `reativar_usuario` desfaz a operação.
-
-A decisão está registrada em
-[ADR-004](adr/ADR-004-exclusao-logica-de-usuarios.md).
-
-### Paridade entre os dois mecanismos de persistência
-
-O CRUD é exercitado nos dois adaptadores exigidos pelo Laboratório 2. Os testes
-de `tests/test_crud_de_usuarios.py` são parametrizados e rodam cada cenário duas
-vezes — uma com `RepositorioUsuarioEmMemoria` (RAM) e outra com
-`RepositorioUsuarioBancoDeDados` (SQLite) — garantindo comportamento idêntico.
-As falhas de infraestrutura do SQLite continuam sendo traduzidas para
-`ErroDeAcessoAoBanco`, preservando o rastro da exceção original.
-
-O diagrama PlantUML correspondente está em:
-
-[`diagrama-classes-sprint7-crud-usuarios.puml`](diagrama-classes-sprint7-crud-usuarios.puml)
-
----
-
-## 11. Rastreabilidade
-
-| Caso de uso / item técnico | Requisito / Laboratório | Entrega |
-| -------------------------- | ------------------------ | ------- |
-| Autenticar por Perfil | RF03 / NF008 | Sprint 2 / Sprint 4 |
-| Adicionar Usuário | RF02 | Sprint 1 / Sprint 2 |
-| Listar Usuários | RF02 | Sprint 1 |
-| Validar Login | Sprint 2 | Sprint 2 / Sprint 7 |
-| Validar Senha com hash | Sprint 2 / NF007 | Sprint 2 / Sprint 4 |
-| Tratar Erros de Validação | Sprint 2 | Sprint 2 |
-| Persistência em Memória RAM | ADR-002 / Repository | Sprint 1 / Sprint 2 / Sprint 4 |
-| Persistência em SQLite | Repository / Banco de Dados | Sprint 4 |
-| Registro de Acessos | Estatísticas de autenticação | Sprint 4 |
-| Adapter de Log de Acessos | Sprint 4 (Adapter) | Sprint 4 |
-| Relatórios de Estatísticas | Sprint 4 (Template Method) | Sprint 4 |
-| CRUD Unidade Básica de Saúde | Sprint 3 (nova entidade) | Sprint 3 |
-| Facade + Singleton Controller | Sprint 3 (Padrões GoF) | Sprint 3 |
-| Contagem total de entidades | Sprint 3 (método Facade) | Sprint 3 |
-| Repository para entidades | Sprint 4 (Repository) | Sprint 4 |
-| Factory Method / Abstract Factory | Sprint 4 (Factory) | Sprint 4 |
-| Command para operações da aplicação | Sprint 5 (Command) | Sprint 5 |
-| Desfazer última atualização de UBS | Sprint 6 (Memento) | Sprint 6 |
-| `MementoUnidadeBasicaSaude` imutável | Sprint 6 (Memento) | Sprint 6 |
-| `HistoricoDeUnidade` com último estado | Sprint 6 (Memento) | Sprint 6 |
-| Integração Memento + Command + Facade | Sprint 6 | Sprint 6 |
-| Diagrama de casos de uso atualizado | Casos de uso até Sprint 6 | Sprint 6 |
-| Diagrama de classe de análise atualizado | Classe de análise até Sprint 6 | Sprint 6 |
-| Diagrama final de padrões | Padrões até Memento | Sprint 6 |
-| Buscar usuário por id e por login | RF02 / Sprint 2 | Sprint 7 |
-| Atualizar usuário | RF02 / Sprint 2 | Sprint 7 |
-| Desativar usuário (exclusão lógica) | RF02 / ADR-004 | Sprint 7 |
-| Login sem números | Sprint 2 (Laboratório 2) | Sprint 7 |
-| CRUD de usuário em RAM e em SQLite | Sprint 2 (dois mecanismos) | Sprint 7 |
-| `UsuarioNaoEncontrado` nas consultas | Sprint 2 (tratamento de erros) | Sprint 7 |
-| Proxy — Autorização por Perfil | Sprint 6 (Proxy) | Sprint 6 |
-| Observer — Eventos de Autenticação | Sprint 6 (Observer) | Sprint 6 |
-| Matriz de Permissões | Sprint 6 (Proxy) | Sprint 6 |
-| Autorização das operações de CRUD de usuário | Sprint 6 (Proxy) / Sprint 7 | Sprint 7 |
-| Autorização do desfazer de UBS | Sprint 6 (Proxy + Memento) | Sprint 7 |
-| Teste de cobertura dos Proxies | Sprint 6 (Proxy) | Sprint 7 |
-
----
-
-## 12. Complemento — Casos de uso e diagrama de análise até Sprint 4
-
-A documentação complementar com a descrição dos três casos de uso mais relevantes,
-o diagrama de casos de uso atualizado e o diagrama de classe de análise referente
-à Sprint 4 está disponível em:
-
-[Complemento de Documentação — Sprint 4](complemento-sprint4-casos-uso-e-analise.md)
-
-> Este complemento permanece no repositório como registro histórico. A visão atual
-> do sistema está consolidada neste documento e no
-> `diagrama-classes-sprint7-crud-usuarios.puml`.
+### UC05 — Registrar e Relatar Acessos
+- **Atores:** Administrador e Gestor da Unidade.
+- **Objetivo:** Gravar logs de tentativa de autenticação e gerar relatórios estatísticos formatados (Texto ou CSV) via **Template Method**.

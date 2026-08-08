@@ -1,26 +1,21 @@
 # Documentação do Projeto
 
-Esta pasta reúne os documentos, diagramas e registros de decisões
-arquiteturais do App Experimental de Apoio à Triagem Médica.
+Esta pasta reúne os documentos, diagramas e registros de decisões arquiteturais do App Experimental de Apoio à Triagem Médica.
 
 ## Documentação atual
 
-- [Diagramas e visão atual do sistema](diagramas-sistema.md)
-- [Diagrama de classes — Sprint 7 (CRUD de Usuário)](diagrama-classes-sprint7-crud-usuarios.puml)
-- [Diagrama de classes — Sprint 5 (Command)](diagrama-classes-sprint5-command.puml)
-- [Documento de Requisitos](documento-de-requisitos.docx)
-- [Registros de Decisões Arquiteturais](adr/README.md)
+- [Documento de Requisitos (Markdown)](documento-de-requisitos.md)
+- [Diagramas e visão atual do sistema (Modelo C4 e Padrões GoF)](diagramas-sistema.md)
+- [Diagramas C4 em PlantUML com Padrões Coloridos](diagramas-c4-sistema.puml)
+- [Registros de Decisões Arquiteturais (ADRs)](adr/README.md)
 
 ## Diagramas
 
-### Estado atual
+### Estado atual C4 (Contexto, Contêineres, Componentes e Código)
 
-- `diagrama-classes-sprint7-crud-usuarios.puml` — diagrama correspondente ao
-  estado atual do backend, com o CRUD completo de `Usuario`, as validações do
-  Laboratório 2 e os padrões já integrados até o **Memento**;
-- `diagramas-sistema.md` — visão consolidada da arquitetura e dos padrões
-  implementados no sistema;
-- `diagrama-classes.puml` — diagrama oficial inicial do backend.
+- `diagramas-sistema.md` — visão consolidada da arquitetura no **Modelo C4** (níveis 1 a 4) e dos 11 padrões GoF identificados por cores.
+- `diagramas-c4-sistema.puml` — arquivo PlantUML estruturado com a representação C4 e diagrama de classes detalhado com códigos de cores.
+- `diagrama-classes-sprint7-crud-usuarios.puml` — diagrama de classes correspondente ao CRUD de usuários e validações.
 
 ### Evolução do projeto
 
