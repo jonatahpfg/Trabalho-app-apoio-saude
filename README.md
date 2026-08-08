@@ -1,5 +1,7 @@
 # App de Apoio à Triagem Médica
 
+**Repositório GitHub:** [https://github.com/jonatahpfg/Trabalho-app-apoio-saude](https://github.com/jonatahpfg/Trabalho-app-apoio-saude)
+
 Aplicativo de apoio à triagem clínica na atenção primária, desenvolvido como projeto acadêmico da disciplina de Engenharia de Software / Métodos de Desenvolvimento de Software.
 
 O sistema contempla o gerenciamento de unidades básicas de saúde, gestores, médicos e demais informações necessárias ao fluxo de atendimento, estruturado com **Arquitetura Hexagonal (Ports & Adapters)**, **Modelo de Arquitetura C4** e **Padrões de Projeto GoF**.
