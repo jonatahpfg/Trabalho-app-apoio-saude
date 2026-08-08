@@ -1,0 +1,26 @@
+@startuml DiagramaC4nivel1
+title Modelo C4 — Nível 1: Contexto do Sistema
+
+actor "Administrador" as Admin
+actor "Gestor da Unidade" as Gestor
+actor "Médico" as Medico
+actor "Paciente (Futuro)" as Paciente
+
+rectangle "App de Apoio à Triagem Médica" <<System>> as SistemaTriagem #SkyBlue {
+    note right of SistemaTriagem
+      Gerencia Usuários, Unidades Básicas de Saúde,
+      Controle de Acesso RBAC, Auditoria de Log
+      e Desfazer de UBS.
+    end note
+}
+
+rectangle "Sistema de Arquivos de Log" <<External System>> as SysLog #LightGray
+rectangle "Banco de Dados SQLite / Memória RAM" <<External System>> as SysDB #LightGray
+
+Admin --> SistemaTriagem : Cadastra usuários, UBS e relatórios
+Gestor --> SistemaTriagem : Gerencia UBS e relatórios
+Medico --> SistemaTriagem : Autentica e consulta dados
+Paciente ..> SistemaTriagem : [Planejado] Agendamento e triagem
+SistemaTriagem --> SysLog : Grava logs de acesso
+SistemaTriagem --> SysDB : Persiste dados de negócios
+@enduml

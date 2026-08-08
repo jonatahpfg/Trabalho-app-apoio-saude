@@ -1,12 +1,12 @@
 ' ==============================================================================
-' Diagramas de Arquitetura C4 e Diagrama de Classes com Padrões Coloridos
-' Sistema: App Experimental de Apoio à Triagem Médica
+' Modelo C4 Completo — Níveis 1 a 4
+' App Experimental de Apoio à Triagem Médica
 ' ==============================================================================
 
-' ==============================================================================
-' MODELO C4 — NÍVEL 1: CONTEXTO DO SISTEMA
-' ==============================================================================
-@startuml c4_nivel1_contexto
+' ------------------------------------------------------------------------------
+' NÍVEL 1: CONTEXTO
+' ------------------------------------------------------------------------------
+@startuml DiagramaC4Completo_Nivel1
 title Modelo C4 — Nível 1: Contexto do Sistema
 
 actor "Administrador" as Admin
@@ -33,10 +33,10 @@ SistemaTriagem --> SysLog : Grava logs de acesso
 SistemaTriagem --> SysDB : Persiste dados de negócios
 @enduml
 
-' ==============================================================================
-' MODELO C4 — NÍVEL 2: CONTÊINERES
-' ==============================================================================
-@startuml c4_nivel2_conteineres
+' ------------------------------------------------------------------------------
+' NÍVEL 2: CONTÊINERES
+' ------------------------------------------------------------------------------
+@startuml DiagramaC4Completo_Nivel2
 title Modelo C4 — Nível 2: Contêineres do Sistema
 
 rectangle "Aplicativo Mobile (React Native)" <<Container>> as AppMobile #Gold {
@@ -59,10 +59,10 @@ BackendApp --> DBBD : Leitura e Escrita SQL via Repositório SQLite
 BackendApp --> LogFile : Gravação e leitura de logs via Adaptador
 @enduml
 
-' ==============================================================================
-' MODELO C4 — NÍVEL 3: COMPONENTES DO BACKEND
-' ==============================================================================
-@startuml c4_nivel3_componentes
+' ------------------------------------------------------------------------------
+' NÍVEL 3: COMPONENTES
+' ------------------------------------------------------------------------------
+@startuml DiagramaC4Completo_Nivel3
 title Modelo C4 — Nível 3: Componentes Internos do Backend
 
 package "Backend Service (Python Hexagonal)" {
@@ -99,10 +99,10 @@ package "Backend Service (Python Hexagonal)" {
 }
 @enduml
 
-' ==============================================================================
-' MODELO C4 — NÍVEL 4: CÓDIGO / DIAGRAMA DE CLASSES COM PADRÕES COLORIDOS
-' ==============================================================================
-@startuml c4_nivel4_codigo_classes
+' ------------------------------------------------------------------------------
+' NÍVEL 4: CÓDIGO / CLASSES E PADRÕES COLORIDOS
+' ------------------------------------------------------------------------------
+@startuml DiagramaC4Completo_Nivel4
 title Modelo C4 — Nível 4: Diagrama de Classes e Padrões Coloridos
 
 legend top right

@@ -1,0 +1,22 @@
+@startuml DiagramaC4nivel2
+title Modelo C4 — Nível 2: Contêineres do Sistema
+
+rectangle "Aplicativo Mobile (React Native)" <<Container>> as AppMobile #Gold {
+    note right of AppMobile: Interface futura para médicos e pacientes
+}
+rectangle "CLI / Script de Execução Python" <<Container>> as AppCLI #Gold {
+    note right of AppCLI: Ponto de entrada atual do backend (__main__.py)
+}
+
+rectangle "Backend Python (Hexagonal Architecture)" <<Container>> as BackendApp #SkyBlue {
+    note right of BackendApp: Contém Domínio, Aplicação, Portas e Adaptadores
+}
+
+database "SQLite (usuarios.db)" <<Container Database>> as DBBD #Salmon
+file "Arquivo de Log (acessos.log)" <<Container File>> as LogFile #Khaki
+
+AppCLI --> BackendApp : Executa operações via Facade
+AppMobile ..> BackendApp : Requisições HTTP/REST [Planejado]
+BackendApp --> DBBD : Leitura e Escrita SQL via Repositório SQLite
+BackendApp --> LogFile : Gravação e leitura de logs via Adaptador
+@enduml

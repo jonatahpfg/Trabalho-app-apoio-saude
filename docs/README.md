@@ -6,7 +6,7 @@ Esta pasta reúne os documentos, diagramas e registros de decisões arquiteturai
 
 - [Documento de Requisitos (Markdown)](documento-de-requisitos.md)
 - [Diagramas e visão atual do sistema (Modelo C4 e Padrões GoF)](diagramas-sistema.md)
-- [Diagramas C4 em PlantUML com Padrões Coloridos](diagramas-c4-sistema.puml)
+- [Pasta de Diagramas C4 por Nível (PlantUML)](<Diagramas C4/>)
 - [Registros de Decisões Arquiteturais (ADRs)](adr/README.md)
 
 ## Diagramas
@@ -14,7 +14,13 @@ Esta pasta reúne os documentos, diagramas e registros de decisões arquiteturai
 ### Estado atual C4 (Contexto, Contêineres, Componentes e Código)
 
 - `diagramas-sistema.md` — visão consolidada da arquitetura no **Modelo C4** (níveis 1 a 4) e dos 11 padrões GoF identificados por cores.
-- `diagramas-c4-sistema.puml` — arquivo PlantUML estruturado com a representação C4 e diagrama de classes detalhado com códigos de cores.
+- `Diagramas C4/` — pasta organizada contendo cada nível isolado e o modelo completo em PlantUML:
+  - `DiagramaC4nivel1.puml` (Contexto)
+  - `DiagramaC4nivel2.puml` (Contêineres)
+  - `DiagramaC4nivel3.puml` (Componentes)
+  - `DiagramaC4nivel4.puml` (Código / Diagrama de Classes)
+  - `DiagramaC4Completo.puml` (Consolidado dos Níveis 1 a 4)
+- `diagramas-c4-sistema.puml` — arquivo PlantUML estruturado de backup.
 - `diagrama-classes-sprint7-crud-usuarios.puml` — diagrama de classes correspondente ao CRUD de usuários e validações.
 
 ### Evolução do projeto

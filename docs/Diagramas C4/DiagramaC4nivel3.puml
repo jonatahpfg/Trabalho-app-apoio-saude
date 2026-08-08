@@ -1,0 +1,36 @@
+@startuml DiagramaC4nivel3
+title Modelo C4 — Nível 3: Componentes Internos do Backend
+
+package "Backend Service (Python Hexagonal)" {
+    [FacadeSingletonController] as CompFacade #LightBlue
+    note right of CompFacade : Padrão Facade + Singleton
+
+    [ExecutorDeComandos] as CompInvoker #LightGreen
+    note right of CompInvoker : Padrão Command (Invoker)
+
+    [Proxies de Autorização] as CompProxy #LightCoral
+    note right of CompProxy : Padrão Proxy (RBAC)
+
+    [GerenciadorDeUsuarios / Unidades] as CompServices #White
+
+    [Publicador & Observadores] as CompObserver #Plum
+    note right of CompObserver : Padrão Observer
+
+    [HistoricoDeUnidade & Memento] as CompMemento #PeachPuff
+    note right of CompMemento : Padrão Memento
+
+    [Seletor & Fábricas de Repositório] as CompFactories #Moccasin
+    note right of CompFactories : Factory Method + Abstract Factory
+
+    [Repositórios & Adaptador de Log] as CompRepos #LightCyan
+    note right of CompRepos : Repository + Adapter
+
+    CompFacade --> CompInvoker : Delega execução
+    CompInvoker --> CompProxy : Executa comando autorizado
+    CompProxy --> CompServices : Delega se autorizado pelo perfil
+    CompServices --> CompObserver : Notifica eventos de login
+    CompServices --> CompMemento : Salva/restaura Memento de UBS
+    CompServices --> CompFactories : Solicita repositórios
+    CompFactories --> CompRepos : Instancia repositórios concretos
+}
+@enduml
